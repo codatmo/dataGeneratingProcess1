@@ -1,0 +1,105 @@
+---
+title: "Simple SIR data simulation"
+author: "Breck Baldwin"
+date:  '`r format(Sys.Date(), "%B %d, %Y")`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+  knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+```
+
+# Model 1
+
+About the simplest SIR model I can think of. Surprisingly error prone process and very sensitive to infection rate. See below. I find it very useful to naively code up a simulation for some problem I am trying to model. I am not an epidemiologist and have no medical training. 
+
+I have looked at some infection models so this is not totally naive, see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which I found to be a good explanation. I have not attempted to reproduce that model here although there is a model reproduction check list I did at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/). 
+
+I don't use standard terms like R0, Rt etc because there are subtleties that I am not sure will get right and wanting to keep things naive. 
+
+There are likely gross errors which please point out in the issue tracker. 
+
+```{r}
+rm(list = ls()) #clean out the cruft
+
+runModel1 = function(runName = runName,
+                     nPop = nPop,
+                     nDays = nDays,
+                     print = PRINT,
+                     probInfectPerContact = probInfectPerContact) {
+  dayState = c('i', rep('s', nPop - 1))
+  infectionDay = c(1, rep(NA, nPop - 1))
+  
+  meanDaysInfectious = 3
+  meanContactsPerDay = 10
+  
+  #dataM = matrix(nrow = nDays, ncol = 3)
+  colNames = c('runName', 'day', 's', 'i', 'r')
+  df = data.frame(matrix(nrow = 0, ncol=length(colNames)))
+  colnames(df) = colNames
+  nextDayState = dayState
+  for (d in 1:nDays) {
+    df[d,] = rep(NA,length(colNames)) #setup data, will cause errors if I miss something
+    df[d,]$runName = runName
+    df[d,]$s=  length(subset(dayState, dayState == 's'))
+    df[d,]$i = length(subset(dayState, dayState == 'i'))
+    df[d,]$r = length(subset(dayState, dayState == 'r'))
+    df[d,]$day = d
+    #dataM[d,] = c(susceptible, infectious, resolved)
+    if (print) {
+      cat(
+        sprintf(
+          "Day=%d, susceptible=%d, infected=%d, resolved=%d\n",
+           df[d,]$day, df[d,]$s, df[d,]$i, df[d,]$r))
+    }
+    for (per in 1:nPop) {
+      #end infectious period
+      if (dayState[per] == 'i') {
+        if (d - infectionDay[per]  > meanDaysInfectious) {
+          nextDayState[per] = 'r'
+        }
+      }
+    }
+    for (per in 1:nPop) {
+      if (dayState[per] == 'i') {
+        for (otherPer in sample(1:nPop, meanContactsPerDay)) {
+          if (dayState[otherPer] == 's' &&
+              rbinom(1, 1, probInfectPerContact) == 1) {
+            nextDayState[otherPer] = 'i'
+            infectionDay[otherPer] = d
+          }
+        }
+      }
+    }
+    dayState = nextDayState
+  }
+  return(df)
+}
+
+dataM = runModel1(runName = "1/30", nPop = 1e+04, nDays = 100, print = TRUE, probInfectPerContact = 1/30)
+
+```
+
+Running this showed lots of sensitivity around 1/31 to 1/33 infection rate. Thought I should graph it, see below:
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+df = data.frame()
+for (i in 20:34) {
+  df2 = runModel1(runName = paste(1, "/", i, sep = ""), nPop = 1e+04, 
+                    nDays = 100, print = FALSE, probInfectPerContact = 1/i)  
+  df = rbind(df,df2)
+}
+
+dfLong = gather(df, key = sir, value = count, c(s, i, r))
+
+plot = ggplot(data = dfLong[dfLong$sir == 'i',], 
+              aes(x = day, y = count, group = runName, color = runName)) +
+  geom_line()
+
+
+print(plot)
+```
