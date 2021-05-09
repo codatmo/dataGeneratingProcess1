@@ -9,6 +9,10 @@ output: html_document
   knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
 ```
 
+# Navigation
+
+This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1](https://github.com/codatmo/dataGeneratingProcess) as 'index.Rmd' and rendered as 'index.html'. 
+
 # Model 1
 
 About the simplest SIR model I can think of. Surprisingly error prone process and very sensitive to infection rate. See below. I find it very useful to naively code up a simulation for some problem I am trying to model. I am not an epidemiologist and have no medical training. 
