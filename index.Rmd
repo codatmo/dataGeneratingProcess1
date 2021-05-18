@@ -237,9 +237,9 @@ T <- nDays
 maxTime <- T
 initial_time <- 0
 n_disease_states <- 8
-n_beta_pieces <- 20
+n_beta_pieces <- 7 # number of days to make beta_pieces (weekly)
 twitter_symptons_start <- 30
-n_rho_twitter_symptons_pieces <- 10
+n_rho_twitter_symptons_pieces <- 7
 population <- nPop
 
 beta_pieceLength <- ceiling(maxTime / n_beta_pieces)
@@ -340,12 +340,12 @@ num_warmup <- 10
 num_samples <- 10
 num_chains <- 1
 
-# model$sample(data=stan_data,
-#              seed=999,
-#              chains=num_chains,
-#              init = initf,
-#              iter_warmup=num_warmup,
-#              iter_sampling=num_samples,
-#              output_dir="output")
+model$sample(data=stan_data,
+             seed=999,
+              chains=num_chains,
+              init = initf,
+              iter_warmup=num_warmup,
+              iter_sampling=num_samples,
+              output_dir="output")
 
 ```
