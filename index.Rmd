@@ -138,3 +138,214 @@ fit <- model$sample(data=stan_data, output_dir="output", num_cores = 4,
                     num_chains = 4)
 print(fit$summary(variables = c('pred_cases')))
 ```
+
+
+# Adding tweets 
+
+Below is a very simple data generating process that produces tweets in addition to modeling a SIR compartment model. 
+
+```{r}
+rm(list = ls())
+set.seed(43614)
+runSim2 = function(runName = runName,
+                     nPop = nPop,
+                     nDays = nDays,
+                     print = PRINT,
+                     probInfectPerContact = probInfectPerContact,
+                     probTweet = probTweet,
+                   probDeath = probDeath) {
+  dayState = c('i', rep('s', nPop - 1))
+  infectionDay = c(1, rep(NA, nPop - 1))
+  tweets = rep(0, nPop)
+  deaths = rep(0,nPop)
+  
+  meanDaysInfectious = 3
+  meanContactsPerDay = 10
+  
+  #dataM = matrix(nrow = nDays, ncol = 3)
+  colNames = c('runName', 'day', 's', 'i', 'r', 'probInfectPerContact', 'tweets','deaths')
+  df = data.frame(matrix(nrow = 0, ncol=length(colNames)))
+  colnames(df) = colNames
+  nextDayState = dayState
+  for (d in 1:nDays) {
+    df[d,] = rep(NA,length(colNames)) #setup data, will cause errors if I miss something
+    df[d,]$runName = runName
+    df[d,]$s=  length(subset(dayState, dayState == 's'))
+    df[d,]$i = length(subset(dayState, dayState == 'i'))
+    df[d,]$r = length(subset(dayState, dayState == 'r'))
+    df[d,]$day = d
+    df[d,]$probInfectPerContact = probInfectPerContact
+    df[d,]$tweets = sum(tweets)
+    df[d,]$deaths = sum(deaths)
+    
+    #dataM[d,] = c(susceptible, infectious, resolved)
+    if (print) {
+      cat(
+        sprintf(
+          "Day=%d, susceptible=%d, infected=%d, resolved=%d, tweets=%d, deaths=%d\n",
+          df[d,]$day, df[d,]$s, df[d,]$i, df[d,]$r, df[d,]$tweets, df[d,]$deaths))
+    }
+    tweets = rep(0, nPop) #start fresh every day, certainly wrong.
+    for (per in 1:nPop) {
+      #end infectious period
+      if (dayState[per] == 'i') {
+        if (d - infectionDay[per]  > meanDaysInfectious) {
+          nextDayState[per] = 'r'
+          if (rbinom(1,1,probDeath) == 1) { #do they die?
+            deaths[per] = 1;
+          }
+        }
+      }
+    }
+    for (per in 1:nPop) {
+      if (dayState[per] == 'i') {
+        tweets[per] = rbinom(1, 1, probTweet)
+        for (otherPer in sample(1:nPop, meanContactsPerDay)) {
+          if (dayState[otherPer] == 's' &&
+              rbinom(1, 1, probInfectPerContact) == 1) {
+            nextDayState[otherPer] = 'i'
+            infectionDay[otherPer] = d
+          }
+        }
+      }
+    }
+    dayState = nextDayState
+  }
+  return(df)
+}
+nWeeks = 10
+nDays = nWeeks * 7
+nPop = 1e+04
+deathsTweetsDf = runSim2(runName = "1/30", nPop = nPop, nDays = nDays, print = TRUE, 
+                  probInfectPerContact = 1/30,
+                  probTweet = 1/10,
+                  probDeath = 3/100)
+
+deaths = colSums(matrix(deathsTweetsDf$deaths, nrow=7))
+
+twitter_symptons <- deathsTweetsDf$tweets
+
+```
+## Model fitting, NOT WORKING
+
+Below is the setup for the Liverpool/Brazil model, I still have some issues with `beta_right` being out of range. 
+
+
+```{r} 
+
+T <- nDays
+maxTime <- T
+initial_time <- 0
+n_disease_states <- 8
+n_beta_pieces <- 20
+twitter_symptons_start <- 30
+n_rho_twitter_symptons_pieces <- 10
+population <- nPop
+
+beta_pieceLength <- ceiling(maxTime / n_beta_pieces)
+beta_left_t <- seq(0, maxTime - 1, by = beta_pieceLength)
+beta_right_t <- c(beta_left_t[2:n_beta_pieces], maxTime + 1)
+
+real_data_length = length(beta_left_t) + length(beta_right_t) + 1
+real_data = c(beta_left_t, beta_right_t, population)
+integer_data = c(
+  maxTime,
+  length(beta_left_t),
+  length(beta_right_t),
+  length(beta_left_t),
+  n_disease_states
+)
+integer_data_length <- length(integer_data)
+
+rho_calls_pieceLength <-
+  ceiling((maxTime - twitter_symptons_start) / n_rho_twitter_symptons_pieces)
+rho_twitter_symptons_left_t <-
+  seq(twitter_symptons_start, maxTime - 1, by = rho_calls_pieceLength)
+rho_twitter_symptons_right_t <-
+  c(rho_twitter_symptons_left_t[2:n_rho_twitter_symptons_pieces], maxTime + 1)
+
+times <- 1:T
+deaths_length <- length(deaths)
+deaths_starts <- seq(from = 1, to = deaths_length * 7, by = 7)
+deaths_stops <- seq(from = 7, to = deaths_length * 7, by = 7)
+twitter_symptons_length <- length(twitter_symptons)
+
+stan_data <- list(
+  initial_time = initial_time,
+  n_beta_pieces = n_beta_pieces,
+  beta_left_t = beta_left_t,
+  beta_right_t = beta_right_t,
+  T = maxTime,
+  times = times,
+  n_disease_states = n_disease_states,
+  population = population,
+  deaths_length = length(deaths),
+  deaths_starts = deaths_starts,
+  deaths_stops = deaths_stops,
+  deaths = deaths,
+  real_data_length = length(beta_left_t) + length(beta_right_t) + 1,
+  real_data = c(beta_left_t, beta_right_t, population),
+  integer_data_length = 5,
+  integer_data = c(
+    maxTime,
+    length(beta_left_t),
+    length(beta_right_t),
+    length(beta_left_t),
+    n_disease_states
+  ),
+  n_rho_twitter_symptons_pieces = n_rho_twitter_symptons_pieces,
+  rho_twitter_symptons_left_t = rho_twitter_symptons_left_t,
+  rho_twitter_symptons_right_t = rho_twitter_symptons_right_t,
+  twitter_symptons_start = twitter_symptons_start,
+  twitter_symptons = twitter_symptons,
+  twitter_symptons_length = twitter_symptons_length,
+  compute_likelihood = 1
+)
+
+```
+
+Running the Stan model, **NOT WORKING** getting NA values in `beta_right_t`.
+
+```{r}
+library("cmdstanr")
+#reminder to set working directory to a sibling to this file and the 'stan' dir below
+model <- cmdstan_model("stan/deaths_twitter.stan")
+
+#fit = model$optimize(data = stan_data) # doesn't work but params check out
+
+set.seed(0)
+initf <- function() {
+  n_beta_pieces <- stan_data$n_beta_pieces
+
+  initial_state_raw = c(runif(1, min = 0.99999, max = 1.0), runif(1, min = 0.0, max = 1.0))
+  beta_left = exp(runif(n_beta_pieces, min = -2, max = 0.5))
+  beta_right = exp(runif(n_beta_pieces, min = -2, max = 0.5))
+  dL = runif(1, min = 3.5, max = 4.0)
+  dI = runif(1, min = 2.2, max = 2.6)
+  dT = runif(1, min = 11.0, max = 13.0)
+  omega = 1/(1 + exp(-runif(1, min = -5, max = -3)))
+
+  list(
+    initial_state_raw = initial_state_raw,
+    beta_left = beta_left,
+    beta_right = beta_right,
+    dL = dL,
+    dI = dI,
+    dT = dT,
+    omega = omega
+  )
+}
+
+num_warmup <- 10
+num_samples <- 10
+num_chains <- 1
+
+# model$sample(data=stan_data,
+#              seed=999,
+#              chains=num_chains,
+#              init = initf,
+#              iter_warmup=num_warmup,
+#              iter_sampling=num_samples,
+#              output_dir="output")
+
+```
