@@ -84,10 +84,15 @@ model {
   sigma_twitter ~ normal(0,1);
   if (compute_likelihood == 1) {
     for (i in 1:n_days) {
-      if (run_SIR == 1) {
+      if (run_SIR == 1 && run_twitter == 1) {
+       real tweet_val = a_twitter + symptomaticTweets[i] * beta_twitter;
+       cases[i] ~ neg_binomial_2(infected_daily_counts[i] + tweet_val, phi);
+        
+      }
+      else if (run_SIR == 1) {
         cases[i] ~ neg_binomial_2(infected_daily_counts[i], phi);
       }
-      if (run_twitter == 1) {
+      else if (run_twitter == 1) {
         cases[i] ~ normal(a_twitter + symptomaticTweets[i] * beta_twitter, 
                           sigma_twitter);
       }
@@ -103,15 +108,17 @@ generated quantities {
 //
  real pred_cases[n_days];
  for (i in 1:n_days) {
-   real predicted_cases = 0;
-    if (run_twitter == 1) {
-     predicted_cases = 
+   if (run_twitter == 1 && run_SIR ==1) {
+      real tweet_val = a_twitter + symptomaticTweets[i] * beta_twitter;
+      pred_cases[i] = neg_binomial_2_rng(infected_daily_counts[i] + tweet_val, phi);
+   }
+   else if (run_twitter == 1) {
+     pred_cases[i] = 
           normal_rng(a_twitter + symptomaticTweets[i] * beta_twitter, sigma_twitter);
     }
-    if (run_SIR) {
-      predicted_cases =  predicted_cases + 
-                         neg_binomial_2_rng(infected_daily_counts[i], phi);
+    else if (run_SIR == 1) {
+      pred_cases[i] = neg_binomial_2_rng(infected_daily_counts[i], phi);
     }
-   pred_cases[i] = predicted_cases;
+
  }
 }

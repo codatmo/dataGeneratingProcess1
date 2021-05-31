@@ -85,6 +85,9 @@ library(tidyverse)
 
 model <- cmdstan_model("stan/tweet_sir_negbin.stan")
 
+# Code modified from 
+# https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html
+
 stan_data <- list(n_days = nrow(deathsTweetsDf), y0 = c(nPop -1, 1, 0), t0 = 0, 
                   ts = 1:nDays, N = nPop, cases = deathsTweetsDf$i, 
                   symptomaticTweets =  deathsTweetsDf$tweets, 
