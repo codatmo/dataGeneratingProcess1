@@ -32,7 +32,7 @@ data {
   real ts[n_days];
   int N;
   int cases[n_days];
-  vector[n_days] symptomaticTweets;
+  int symptomaticTweets[n_days];
   int<lower = 0, upper = 1> compute_likelihood;
   int<lower = 0, upper = 1> run_twitter;
   int<lower = 0, upper = 1> run_SIR;
@@ -40,26 +40,27 @@ data {
 transformed data {
   real x_r[0]; //need for ODE function
   int x_i[1] = { N }; //need for ODE function
+  int s_index = 1;
+  int i_index = 2;
+  int r_index = 3;
 }
 parameters {
   real<lower=0> gamma;
   real<lower=0> beta;
-  real<lower=0> phi_inv;
-  real<lower = 0> a_twitter;
-  real beta_twitter;
-  real<lower=0> sigma_twitter;
+  real<lower=.001> phi_inv;
+  real<lower=.001> lambda_twitter;
+  real<lower=.001> phi_twitter_inv;
 }
 transformed parameters{
   real y[n_days, 3];
   real phi = 1. / phi_inv;
-  vector[n_days] infected_daily_counts;
-  if (run_SIR == 1) {
+  real phi_twitter = 1. / phi_twitter_inv;
+  vector[n_days] infected_daily_counts_ODE;
     real theta[2];
     theta[1] = beta;
     theta[2] = gamma;
-  
     y = integrate_ode_rk45(sir, y0, t0, ts, theta, x_r, x_i);
-    infected_daily_counts = col(to_matrix(y), 2);
+    infected_daily_counts_ODE = col(to_matrix(y), i_index);
 /*    print("y0=", y0, "t0=", t0, "ts=", ts, "theta=", theta, "x_r=", x_r, 
           "x_i=", x_i, "y=", y);
     y0=[9999,1,0]
@@ -71,54 +72,37 @@ transformed parameters{
     [9998.96,0.894708,0.141713],[9998.95,0.862134,0.185553],[9998.94,0.830746,0.227797],
     [9998.93,0.800501,0.268504],[9998.92,0.771358,0.307728]] 
 */
-  }
+
 }
 model {
   //priors
   beta ~ normal(2, 1);
   gamma ~ normal(0.4, 0.5);
   phi_inv ~ exponential(5);
-
-  a_twitter ~ normal(0,1);
-  beta_twitter ~ normal(0,.5);
-  sigma_twitter ~ normal(0,1);
-  if (compute_likelihood == 1) {
+  lambda_twitter ~ normal(0,1);
+  phi_twitter_inv ~ exponential(5);
+  if (compute_likelihood == 1){ 
     for (i in 1:n_days) {
-      if (run_SIR == 1 && run_twitter == 1) {
-       real tweet_val = a_twitter + symptomaticTweets[i] * beta_twitter;
-       cases[i] ~ neg_binomial_2(infected_daily_counts[i] + tweet_val, phi);
-        
+      if (run_SIR == 1) {
+        cases[i] ~ neg_binomial_2(infected_daily_counts_ODE[i], phi);
       }
-      else if (run_SIR == 1) {
-        cases[i] ~ neg_binomial_2(infected_daily_counts[i], phi);
-      }
-      else if (run_twitter == 1) {
-        cases[i] ~ normal(a_twitter + symptomaticTweets[i] * beta_twitter, 
-                          sigma_twitter);
+      if (run_twitter == 1) {
+        symptomaticTweets[i] ~ neg_binomial_2(lambda_twitter*infected_daily_counts_ODE[i], phi_twitter);
       }
     }
   }
 }
 generated quantities {
-  /*real R0 = beta / gamma;
+  real R0 = beta / gamma;
   real recovery_time = 1 / gamma;
   real pred_cases[n_days];
-  pred_cases = neg_binomial_2_rng(pred_cases), phi);
-*/
-//
- real pred_cases[n_days];
- for (i in 1:n_days) {
-   if (run_twitter == 1 && run_SIR ==1) {
-      real tweet_val = a_twitter + symptomaticTweets[i] * beta_twitter;
-      pred_cases[i] = neg_binomial_2_rng(infected_daily_counts[i] + tweet_val, phi);
-   }
-   else if (run_twitter == 1) {
-     pred_cases[i] = 
-          normal_rng(a_twitter + symptomaticTweets[i] * beta_twitter, sigma_twitter);
-    }
-    else if (run_SIR == 1) {
-      pred_cases[i] = neg_binomial_2_rng(infected_daily_counts[i], phi);
-    }
-
- }
+  real pred_tweets[n_days];
+  for (i in 1:n_days) {
+      if (run_twitter == 1) {
+          pred_tweets[i] = neg_binomial_2_rng(lambda_twitter*infected_daily_counts_ODE[i], phi_twitter);
+      }
+      if (run_SIR == 1) {
+          pred_cases[i] = neg_binomial_2_rng(infected_daily_counts_ODE[i], phi);
+      }
+  }
 }
