@@ -134,7 +134,7 @@ runSim2 = function(runName = runName,
   }
   return(df)
 }
-nWeeks = 10
+nWeeks = 20
 nDays = nWeeks * 7
 nPop = 1e+04
 # simDf = runSim2(runName = "1/30", nPop = nPop, nDays = nDays, 
@@ -144,14 +144,14 @@ nPop = 1e+04
 #                          probDeath = 3/100)
 
 
-betaInfRate = .4
-gammaResRate = .33
-probTweet = .5
+betaInfRateSim = .4
+gammaResRateSim = .33
+probTweetSim = .5
 infStartValue = 1
 
 simDf = runSim3(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE, 
-                betaInfRate = betaInfRate, gammaResRate = gammaResRate, 
-                probTweet = probTweet, infStartValue = infStartValue)
+                betaInfRate = betaInfRateSim, gammaResRate = gammaResRateSim, 
+                probTweet = probTweetSim, infStartValue = infStartValue)
 
 library("cmdstanr")
 library(tidyverse)
@@ -182,10 +182,10 @@ fit <- model$sample(data=stan_data, output_dir="output",
 resultsBetaDf = fit$summary(variables = c('beta'))
 resultsGammaDf = fit$summary(variables = c('gamma'))
 
-cat(paste0(sprintf("Simulated vs fit values: \nbetaInfRate=%.2f, beta=%.2f, sd=%.2f", 
-                    betaInfRate, resultsBetaDf$mean, resultsBetaDf$sd),
-             sprintf("\ngammaResRate=%.2f, gamma=%.2f, sd=%.2f",
-                     gammaResRate,resultsGammaDf$mean, resultsGammaDf$sd)))
+cat(paste0(sprintf("Simulated vs fit values: \nbetaInfRateSim=%.2f, beta=%.2f, sd=%.2f", 
+                    betaInfRateSim, resultsBetaDf$mean, resultsBetaDf$sd),
+             sprintf("\ngammaResRateSim=%.2f, gamma=%.2f, sd=%.2f",
+                     gammaResRateSim,resultsGammaDf$mean, resultsGammaDf$sd)))
 
 predCasesDf = fit$summary(variables = c('pred_cases'))
 predCasesDf$day = 1:nrow(predCasesDf)
@@ -211,12 +211,12 @@ resultsBetaDf2 = fitTwitter$summary(variables = c('beta'))
 resultsGammaDf2 = fitTwitter$summary(variables = c('gamma'))
 resultsLambdaTwitter = fitTwitter$summary(variables = c('lambda_twitter'))
 
-cat(paste0(sprintf("Simulated vs fit values: \nbetaInfRate=%.2f, beta=%.2f, sd=%.2f", 
-                   betaInfRate, resultsBetaDf2$mean, resultsBetaDf2$sd),
-           sprintf("\ngammaResRate=%.2f, gamma=%.2f, sd=%.2f",
-                   gammaResRate,resultsGammaDf2$mean, resultsGammaDf2$sd)),
-           sprintf("\nprobTweet=%.2f, lambda_twitter=%.2f, sd=%.2f",
-                   probTweet, resultsLambdaTwitter$mean, resultsLambdaTwitter$sd)
+cat(paste0(sprintf("Simulated vs fit values: \nbetaInfRateSim=%.2f, beta=%.2f, sd=%.2f", 
+                   betaInfRateSim, resultsBetaDf2$mean, resultsBetaDf2$sd),
+           sprintf("\ngammaResRateSim=%.2f, gamma=%.2f, sd=%.2f",
+                   gammaResRateSim,resultsGammaDf2$mean, resultsGammaDf2$sd)),
+           sprintf("\nprobTweetSim=%.2f, lambda_twitter=%.2f, sd=%.2f",
+                   probTweetSim, resultsLambdaTwitter$mean, resultsLambdaTwitter$sd)
 )
 
 # #print(fit$summary(variables = c('pred_cases')))
@@ -242,25 +242,59 @@ cat(paste0(sprintf("Simulated vs fit values: \nbetaInfRate=%.2f, beta=%.2f, sd=%
 # #   geom_point(data = simDf, color = "orange")
 # 
 # 
-predCasesDf = fit$summary(variables = c('pred_cases'))
+minQuantile = .2
+maxQuantile = .8
+minQuantileLabel = '20%'
+maxQuantileLabel = '80%'
+
+predCasesDf = fit$summary(variables = c('pred_cases'), mean,
+                          ~quantile(.x, probs = c(minQuantile, maxQuantile)))
 predCasesDf$day = 1:nrow(predCasesDf)
 
+predCasesTwitterDf = fitTwitter$summary(variables = c('pred_cases'), mean,
+                                        ~quantile(.x, 
+                                                  probs = c(minQuantile, 
+                                                            maxQuantile)))
+predCasesTwitterDf$day = 1:nrow(predCasesTwitterDf)
 
-# predCasesSIRDf = fit_no_twitter$summary(variables = c('pred_cases'))
-# predCasesSIRDf$day = 1:nrow(predCasesSIRDf)
-# predTweetsDf = fit$summary(variables = c('pred_tweets'))
-# predTweetsDf$day = 1:nrow(predTweetsDf)
-# 
- ggplot(data = NULL, aes(x = day, y = mean)) +
-   geom_ribbon(data = predCasesDf, aes(ymin = q5, ymax = q95, alpha = 0.3)) +
-#   geom_line(data = predCasesSIRDf, aes(y = mean), color="white") +
-   geom_point(data = simDf, aes(y = i), color = "red")
-#   geom_ribbon(data = predTweetsDf, aes(ymin = q5, ymax = q95, alpha = 0.3)) +
-#    geom_line(data = predTweetsDf) + 
-#    geom_point(data = simDf, aes(y = tweets), color = "blue") +
-# #  scale_fill_manual(labels = c('infected', 'tweets'))
-#    labs(y = "mean with 95% interval",
-#         caption = "predicted shaded, lines with dots for truth") +
-#    theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
+
+predTweetsDf = fitTwitter$summary(variables = c('pred_tweets'), mean,
+                                  ~quantile(.x, 
+                                            probs = c(minQuantile, 
+                                                      maxQuantile)))
+predTweetsDf$day = 1:nrow(predTweetsDf)
+
+predCasesLine = 'predicted cases'
+predCasesRibbon = paste0('predicted cases ',minQuantileLabel, '/', maxQuantileLabel)
+
+ggplot(data = NULL, aes(x = day, y = mean)) +
+   #cases no twitter info
+   geom_ribbon(data = predCasesDf, aes(ymin = .data[[minQuantileLabel]], 
+                                       ymax = .data[[maxQuantileLabel]], 
+                                       fill = predCasesRibbon), 
+               alpha = 0.3, fill = "red") +
+   geom_line(data = predCasesDf, 
+             aes(color = 'pred cases infection')) +
+   #cases twitter informed
+   geom_ribbon(data = predCasesTwitterDf,  aes(ymin = .data[[minQuantileLabel]], 
+                                               ymax = .data[[maxQuantileLabel]], 
+                                               fill = predCasesRibbon),
+               alpha = 0.3, fill = "blue") + 
+   geom_line(data = predCasesTwitterDf, aes(color = 'pred cases infection + twitter')) +
+
+   geom_point(data = simDf, aes(y = i, color = 'sim cases'), size = .5, color = "black") +
+
+   #twitter
+   geom_ribbon(data = predTweetsDf,  aes(ymin = .data[[minQuantileLabel]], 
+                                         ymax = .data[[maxQuantileLabel]], 
+                                         fill = 'pred tweets'),
+               alpha = 0.3, fill = "yellow") +
+   geom_line(data = predTweetsDf, aes(color = 'pred tweets')) + 
+   geom_point(data = simDf, aes(y = tweets, color = 'sim tweets'), size = .5, color = 'black') +
+   
+   #  scale_fill_manual(labels = c('infected', 'tweets'))
+    labs(y = "mean with 80% shaded interval and sim data in dots",
+         caption = "predicted shaded, lines with dots for simulated truth") +
+    theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
 # # 
 # #   
