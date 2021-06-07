@@ -4,7 +4,7 @@ Modified from https://mc-stan.org/users/documentation/case-studies/boarding_scho
 */
 
 functions {
-  real[] sir(real t, real[] y, real[] theta, 
+  real[] sird(real t, real[] y, real[] theta, 
              real[] x_r, int[] x_i) {
 
       real S = y[1];
@@ -12,29 +12,37 @@ functions {
       real R = y[3];
       real D = y[4];
       real N = x_i[1];
-      
+
       real beta = theta[1];
       real gamma = theta[2];
       real deathRate = theta[3];
-      // real alpha_tweet_generation = theta[3];
-      
+     
       real dS_dt = -beta * I * S / N;
       real dI_dt =  beta * I * S / N - gamma * I;
       real dR_dt =  gamma * I;
       real dD_dt =  deathRate * R; 
-      // real dT_dt = alpha_tweet_generation * ;I
-      
+  /*
+            print("t=", t);
+            
+      print("SIRD=", y);
+      print("N=", N);
+      print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt});
+    */  
       return {dS_dt, dI_dt, dR_dt, dD_dt};
   }
 }
 data {
   int<lower=1> n_days;
-   real y0[4];
+  int nDataCols;
+  int<lower=1> n_compartments;
+  real y0[4];
   real t0;
   real ts[n_days];
   int N;
-  int cases[n_days];
-  int symptomaticTweets[n_days];
+  int compartmentDays[n_days, nDataCols];
+  int compartment;
+  int tweetIndex;
+  int tweetSourceIndex;
   int<lower = 0, upper = 1> compute_likelihood;
   int<lower = 0, upper = 1> run_twitter;
   int<lower = 0, upper = 1> run_SIR;
@@ -46,6 +54,7 @@ transformed data {
   int i_index = 2;
   int r_index = 3;
   int d_index = 4;
+  print("compartment=", compartment);
 }
 parameters {
   real<lower=0> gamma;
@@ -56,18 +65,16 @@ parameters {
   real<lower=.001> phi_twitter_inv;
 }
 transformed parameters{
-  real y[n_days, 4];
+  real y[n_days, n_compartments];
   real phi = 1. / phi_inv;
   real phi_twitter = 1. / phi_twitter_inv;
-  vector[n_days] infected_daily_counts_ODE;
-    vector[n_days] deaths_daily_counts_ODE;
-    real theta[3];
-    theta[1] = beta;
-    theta[2] = gamma;
-    theta[3] = deaths;
-    y = integrate_ode_rk45(sir, y0, t0, ts, theta, x_r, x_i);
-    infected_daily_counts_ODE = col(to_matrix(y), i_index);
-    deaths_daily_counts_ODE = col(to_matrix(y), d_index);
+  matrix[n_days, n_compartments] daily_counts_ODE;
+  real theta[3];
+  theta[1] = beta;
+  theta[2] = gamma;
+  theta[3] = deaths;
+  y = integrate_ode_rk45(sird, y0, t0, ts, theta, x_r, x_i);
+  daily_counts_ODE = to_matrix(y);
 /*    print("y0=", y0, "t0=", t0, "ts=", ts, "theta=", theta, "x_r=", x_r, 
           "x_i=", x_i, "y=", y);
     y0=[9999,1,0]
@@ -86,33 +93,38 @@ model {
   beta ~ normal(2, 1);
   gamma ~ normal(0.4, 0.5);
   deaths ~ normal(0.1, 0.1);
-  phi_inv ~ exponential(5);
+  phi_inv ~ exponential(5); 
   lambda_twitter ~ normal(0,1);
   phi_twitter_inv ~ exponential(5);
   if (compute_likelihood == 1){ 
     for (i in 1:n_days) {
       if (run_SIR == 1) {
-        cases[i] ~ neg_binomial_2(deaths_daily_counts_ODE[i], phi);
+        compartmentDays[i,compartment] ~ neg_binomial_2(daily_counts_ODE[i, compartment], phi);
       }
       if (run_twitter == 1) {
-        symptomaticTweets[i] ~ neg_binomial_2(lambda_twitter*
-                                              infected_daily_counts_ODE[i], 
+        compartmentDays[i,tweetIndex] ~ neg_binomial_2(lambda_twitter *
+                                              daily_counts_ODE[i,tweetSourceIndex], 
                                               phi_twitter);
       }
     }
   }
 }
+
 generated quantities {
   real R0 = beta / gamma;
   real recovery_time = 1 / gamma;
   real pred_cases[n_days];
   real pred_tweets[n_days];
+  matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
   for (i in 1:n_days) {
       if (run_twitter == 1) {
-          pred_tweets[i] = neg_binomial_2_rng(lambda_twitter*infected_daily_counts_ODE[i], phi_twitter);
+          pred_tweets[i] = neg_binomial_2_rng(lambda_twitter *
+                                   daily_counts_ODE[i, tweetSourceIndex], 
+                                   phi_twitter);
       }
       if (run_SIR == 1) {
-          pred_cases[i] = neg_binomial_2_rng(infected_daily_counts_ODE[i], phi);
+          pred_cases[i] = neg_binomial_2_rng(daily_counts_ODE[i, compartment], 
+                                             phi);
       }
   }
 }

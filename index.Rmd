@@ -159,6 +159,12 @@ print(fit$summary(variables = c('pred_cases')))
 
 # Adding tweets 
 
+I translated the naive model above into a paramaterization that matched a typical SIR model to make it easier to understand how the SIR model worked and make it possible to recover the simulation parameters. One observation is that I had to hack the parameters quite a bit to get a viable epidemic. Plausable values often led to no outbreak at all. For consistencies sake I 'primed' the outbreak with patient's 0 through 10 just to be sure of some transmission in the early stages. 
+
+
+# Naive tweet model
+
+
 Below is a very simple data generating process that produces tweets in addition to modeling a SIR compartment model. 
 
 ```{r}
