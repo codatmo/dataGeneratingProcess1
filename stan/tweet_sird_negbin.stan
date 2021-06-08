@@ -19,15 +19,52 @@ functions {
      
       real dS_dt = -beta * I * S / N;
       real dI_dt =  beta * I * S / N - gamma * I ;
-      real dR_dt =  gamma * I; //- deathRate * R;
+      real dR_dt =  gamma * I - deathRate * R;
       real dD_dt =  deathRate * R; 
-/*  
+ 
       print("t=", t);
       print("SIRD=", y);
       print("beta, gamma, deathRate", theta);
-      print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt});
-  */    
+      print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt},
+            " sum=", sum({dS_dt, dI_dt, dR_dt, dD_dt}));
+  
       return {dS_dt, dI_dt, dR_dt, dD_dt};
+  }
+
+  real[,] my_sird(int days, real[] y, real[] theta, 
+             real[] x_r, int[] x_i) {
+    real day_counts[days,4];
+    real S = y[1];
+    real I = y[2];
+    real R = y[3];
+    real D = y[4];
+    real N = x_i[1];
+    real beta = theta[1];
+    real gamma = theta[2];
+    real deathRate = theta[3];
+    /*
+    print("beta, gamma, deathRate=", theta);  
+    print("0 SIRD=", y," sum=", sum(y));
+    */
+    for (i in 1:days) {
+      real dS_dt = -beta * I * S / N;
+      real dI_dt =  beta * I * S / N - gamma * I ;
+      real dR_dt =  gamma * I - deathRate * R;
+      real dD_dt =  deathRate * R; 
+    /*
+    print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt},
+            " sum=", sum({dS_dt, dI_dt, dR_dt, dD_dt}));
+            */
+      S = dS_dt + S;
+      I = dI_dt + I;
+      R = dR_dt + R;
+      D = dD_dt + D;
+      day_counts[i] = {S, I, R, D};
+/*
+      print(i," SIRD=", day_counts[i], " sum=", sum(day_counts[i]));
+      */
+    }
+    return day_counts;
   }
 }
 
@@ -57,9 +94,9 @@ transformed data {
   print("compartment=", compartment);
 }
 parameters {
-  real<lower=0> gamma;
-  real<lower=0> beta;
-  real<lower=0> deaths;
+  real<lower = 0, upper = 1> gamma;
+  real<lower=0, upper = 2> beta;
+  real<lower=0, upper = 1> deaths;
   real<lower = 0> sigma_compartment_noise;
   real<lower = 0> sigma_i_compartment_noise;
   real<lower = 0> sigma_twitter_noise;
@@ -76,7 +113,8 @@ transformed parameters{
   theta[1] = beta;
   theta[2] = gamma;
   theta[3] = deaths;
-  y = integrate_ode_rk45(sird, y0, t0, ts, theta, x_r, x_i);
+  //y = integrate_ode_rk45(sird, y0, t0, ts, theta, x_r, x_i);
+  y = my_sird(n_days, y0, theta, x_r, x_i);
   daily_counts_ODE = to_matrix(y);
   //if (check_ODE ==1 && sum(daily_counts_ODE) - n_days * N < 2) {
   //   

@@ -114,14 +114,15 @@ stan_data <- list(n_days = nrow(simDf),
                   tweetIndex = 5,
                   tweetSourceIndex = tweetSourceIndex,
                   compute_likelihood = 1,
-                  run_twitter = 0,
-                  run_SIR = 1)
+                  run_twitter = 1,
+                  run_SIR = 1,
+                  check_ODE = 0)
 
 fit <- model$sample(data=stan_data, 
-                    parallel_chains = 1,
+                    parallel_chains = 4,
                     iter_warmup = 1000,
-                    iter_sampling = 100,
-                    chains = 1,
+                    iter_sampling = 1000,
+                    chains = 4,
                     seed = 4857)
 
 resultsOdeDf = fit$summary(variables = c('ode_states'))
@@ -139,10 +140,12 @@ odeLongDf = gather(data = odeDf, key = "compartmentODE", value = "mean",
 simLongDf = gather(data = simDf, key = "compartmentSim", value = "count",
                    all_of(c('tweets', compartmentNames)))
 
-ggplot(data = NULL, aes(x = day, y = mean)) +
+plot = ggplot(data = NULL, aes(x = day, y = mean)) +
   geom_line(data = odeLongDf, aes(color = compartmentODE)) +
   geom_point(data = simLongDf, aes(y = count, color = compartmentSim), size = .5) +
   labs(y = "median with sim data in dots",
      caption = paste0("predicted shaded, lines with dots for simulated truth, compartment is = ",
      compartmentName), " tweets from ", tweetSourceName) +
   theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
+
+print(plot)

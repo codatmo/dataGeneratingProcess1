@@ -29,6 +29,7 @@ This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) 
 
 About the simplest SIR model I can think of. Writing this was a surprisingly error prone process and very sensitive to infection rate. See below. I find it very useful to naively code up a simulation for some problem I am trying to model. I am not an epidemiologist and have no medical training. 
 
+
 I have looked at some infection models so this is not totally naive, see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which I found to be a good explanation. This is the model I used to fit this data, there is a model reproduction check list at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/). 
 
 There are likely gross errors which please point out in the issue tracker or send me email. 
