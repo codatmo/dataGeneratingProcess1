@@ -18,19 +18,19 @@ functions {
       real deathRate = theta[3];
      
       real dS_dt = -beta * I * S / N;
-      real dI_dt =  beta * I * S / N - gamma * I;
-      real dR_dt =  gamma * I;
+      real dI_dt =  beta * I * S / N - gamma * I ;
+      real dR_dt =  gamma * I; //- deathRate * R;
       real dD_dt =  deathRate * R; 
-  /*
-            print("t=", t);
-            
+/*  
+      print("t=", t);
       print("SIRD=", y);
-      print("N=", N);
+      print("beta, gamma, deathRate", theta);
       print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt});
-    */  
+  */    
       return {dS_dt, dI_dt, dR_dt, dD_dt};
   }
 }
+
 data {
   int<lower=1> n_days;
   int nDataCols;
@@ -50,16 +50,19 @@ data {
 transformed data {
   real x_r[0]; //need for ODE function
   int x_i[1] = { N }; //need for ODE function
-  int s_index = 1;
-  int i_index = 2;
-  int r_index = 3;
-  int d_index = 4;
+  //y0
+  //compartmentDays
+  //sd
+  //mean
   print("compartment=", compartment);
 }
 parameters {
   real<lower=0> gamma;
   real<lower=0> beta;
   real<lower=0> deaths;
+  real<lower = 0> sigma_compartment_noise;
+  real<lower = 0> sigma_i_compartment_noise;
+  real<lower = 0> sigma_twitter_noise;
   real<lower=.001> phi_inv;
   real<lower=.001> lambda_twitter;
   real<lower=.001> phi_twitter_inv;
@@ -75,6 +78,9 @@ transformed parameters{
   theta[3] = deaths;
   y = integrate_ode_rk45(sird, y0, t0, ts, theta, x_r, x_i);
   daily_counts_ODE = to_matrix(y);
+  //if (check_ODE ==1 && sum(daily_counts_ODE) - n_days * N < 2) {
+  //   
+  
 /*    print("y0=", y0, "t0=", t0, "ts=", ts, "theta=", theta, "x_r=", x_r, 
           "x_i=", x_i, "y=", y);
     y0=[9999,1,0]
@@ -94,17 +100,29 @@ model {
   gamma ~ normal(0.4, 0.5);
   deaths ~ normal(0.1, 0.1);
   phi_inv ~ exponential(5); 
+  sigma_compartment_noise ~ normal(0,20);
+  sigma_i_compartment_noise ~ normal(0,20);
+  sigma_twitter_noise ~ normal(0,20);
   lambda_twitter ~ normal(0,1);
   phi_twitter_inv ~ exponential(5);
   if (compute_likelihood == 1){ 
     for (i in 1:n_days) {
       if (run_SIR == 1) {
-        compartmentDays[i,compartment] ~ neg_binomial_2(daily_counts_ODE[i, compartment], phi);
+//        compartmentDays[i,compartment] ~ neg_binomial_2(daily_counts_ODE[i, compartment], phi);
+        compartmentDays[i, compartment] ~ normal(daily_counts_ODE[i, compartment], 
+                                       sigma_i_compartment_noise);
+        /*compartmentDays[i,compartment] ~ normal(daily_counts_ODE[i, compartment], 
+                                                sigma_compartment_noise);
+                                                */
       }
       if (run_twitter == 1) {
-        compartmentDays[i,tweetIndex] ~ neg_binomial_2(lambda_twitter *
+        compartmentDays[i,tweetIndex] ~ normal(lambda_twitter * 
+                                          daily_counts_ODE[i, tweetSourceIndex],
+                                          sigma_twitter_noise);
+        
+        /*neg_binomial_2(lambda_twitter *
                                               daily_counts_ODE[i,tweetSourceIndex], 
-                                              phi_twitter);
+                                              phi_twitter);*/
       }
     }
   }
@@ -115,16 +133,28 @@ generated quantities {
   real recovery_time = 1 / gamma;
   real pred_cases[n_days];
   real pred_tweets[n_days];
+  real pred_i[n_days];
   matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
   for (i in 1:n_days) {
       if (run_twitter == 1) {
-          pred_tweets[i] = neg_binomial_2_rng(lambda_twitter *
+          pred_tweets[i] = normal_rng(lambda_twitter *
+                                   daily_counts_ODE[i, tweetSourceIndex],
+                                   sigma_twitter_noise);
+          
+          /*
+          neg_binomial_2_rng(lambda_twitter *
                                    daily_counts_ODE[i, tweetSourceIndex], 
                                    phi_twitter);
+                                   */
       }
       if (run_SIR == 1) {
-          pred_cases[i] = neg_binomial_2_rng(daily_counts_ODE[i, compartment], 
-                                             phi);
+          pred_cases[i] = normal_rng(daily_counts_ODE[i, compartment], 
+                                     sigma_compartment_noise);
+                // neg_binomial_2_rng(daily_counts_ODE[i, compartment], 
+                //                            phi);
+         /* pred_i[i] = normal_rng(daily_counts_ODE[i,2], 
+                      sigma_i_compartment_noise);
+                      */
       }
   }
 }

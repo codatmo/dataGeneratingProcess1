@@ -91,7 +91,7 @@ library(tidyverse)
 # If running from RStudio remember to set the working directory
 # >Session>Set Working Directory>To Source File Location
 
-model <- cmdstan_model("stan/tweet_sird_negbin.stan")
+model <- cmdstan_model("/home/breck/git/codatmo/dataGeneratingProcess1/stan/tweet_sird_negbin.stan")
 
 # Code modified from 
 # https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html
@@ -111,17 +111,17 @@ stan_data <- list(n_days = nrow(simDf),
                   nDataCols = ncol(simData),
                   compartmentDays = simData, 
                   compartment = compartment, 
-                  tweetIndex = 6,
+                  tweetIndex = 5,
                   tweetSourceIndex = tweetSourceIndex,
                   compute_likelihood = 1,
                   run_twitter = 0,
                   run_SIR = 1)
 
-fit <- model$sample(data=stan_data, output_dir="output", 
-                    parallel_chains = 4,
+fit <- model$sample(data=stan_data, 
+                    parallel_chains = 1,
                     iter_warmup = 1000,
-                    iter_sampling = 1000,
-                    chains = 4,
+                    iter_sampling = 100,
+                    chains = 1,
                     seed = 4857)
 
 resultsOdeDf = fit$summary(variables = c('ode_states'))
