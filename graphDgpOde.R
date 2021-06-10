@@ -10,7 +10,7 @@ SIRDsim = function(runName = runName,
                    deathRate = deathRate,
                    probTweet = probTweet,
                    infStartValue = infStartValue) {
-  
+
   dayState = c(rep('i',infStartValue), rep('s', nPop - infStartValue))
   tweets = rep(0, nPop)
   contactPopulationSize = 10
@@ -31,9 +31,9 @@ SIRDsim = function(runName = runName,
     if (print) {
       cat(
         sprintf(
-          "Day=%d, susceptible=%d, infected=%d, resolved=%d, dead today=%d, 
+          "Day=%d, susceptible=%d, infected=%d, resolved=%d, dead today=%d,
           dead=%d, tweets=%d, R0=%.2f\n",
-          df[day,]$day, df[day,]$s, df[day,]$i, df[day,]$r, df[day,]$d_today, 
+          df[day,]$day, df[day,]$s, df[day,]$i, df[day,]$r, df[day,]$d_today,
           df[day,]$d, df[day,]$tweets, betaInfRate/gammaResRate))
     }
     tweets = rep(0, nPop) #start fresh every day, certainly wrong.
@@ -41,7 +41,7 @@ SIRDsim = function(runName = runName,
       #end infectious period
       if (dayState[per] == 'i') {
         tweets[per] = rbinom(1, 1, probTweet)
-        if (rbinom(n = 1, size = 1, prob = gammaResRate) == 1) {  
+        if (rbinom(n = 1, size = 1, prob = gammaResRate) == 1) {
           if (rbinom(n = 1, size = 1, prob = deathRate) == 1) {
             nextDayState[per] = 'd' #not doing daily *1
           }
@@ -78,9 +78,9 @@ probTweetSim = .5
 deathRateSim = .1
 infStartValue = 10
 
-simDf = SIRDsim(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE, 
-                betaInfRate = betaInfRateSim, gammaResRate = gammaResRateSim, 
-                probTweet = probTweetSim, deathRate = deathRateSim, 
+simDf = SIRDsim(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE,
+                betaInfRate = betaInfRateSim, gammaResRate = gammaResRateSim,
+                probTweet = probTweetSim, deathRate = deathRateSim,
                 infStartValue = infStartValue)
 
 
@@ -91,26 +91,26 @@ library(tidyverse)
 # If running from RStudio remember to set the working directory
 # >Session>Set Working Directory>To Source File Location
 
-model <- cmdstan_model("/home/breck/git/codatmo/dataGeneratingProcess1/stan/tweet_sird_negbin.stan")
+model <- cmdstan_model(here::here("stan", "tweet_sird_negbin.stan"))
 
-# Code modified from 
+# Code modified from
 # https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html
 
-simData = matrix(data = c(simDf$s, simDf$i, simDf$r, simDf$d, 
-                          simDf$tweets), 
+simData = matrix(data = c(simDf$s, simDf$i, simDf$r, simDf$d,
+                          simDf$tweets),
                  nrow = nrow(simDf), ncol = 5)
 
 compartment = 4
 tweetSourceIndex = 2
-stan_data <- list(n_days = nrow(simDf), 
-                  y0 = c(nPop - infStartValue, infStartValue, 0, 0), 
-                  t0 = 0, 
-                  ts = 1:nDays, 
-                  N = nPop, 
+stan_data <- list(n_days = nrow(simDf),
+                  y0 = c(nPop - infStartValue, infStartValue, 0, 0),
+                  t0 = 0,
+                  ts = 1:nDays,
+                  N = nPop,
                   n_compartments = ncol(simData) - 1,
                   nDataCols = ncol(simData),
-                  compartmentDays = simData, 
-                  compartment = compartment, 
+                  compartmentDays = simData,
+                  compartment = compartment,
                   tweetIndex = 5,
                   tweetSourceIndex = tweetSourceIndex,
                   compute_likelihood = 1,
@@ -118,7 +118,7 @@ stan_data <- list(n_days = nrow(simDf),
                   run_SIR = 1,
                   check_ODE = 0)
 
-fit <- model$sample(data=stan_data, 
+fit <- model$sample(data=stan_data,
                     parallel_chains = 4,
                     iter_warmup = 1000,
                     iter_sampling = 1000,
@@ -129,7 +129,7 @@ resultsOdeDf = fit$summary(variables = c('ode_states'))
 compartmentNames = c('s','i','r','d');
 compartmentName = compartmentNames[compartment]
 tweetSourceName = compartmentNames[tweetSourceIndex]
-odeDf = data.frame(matrix(resultsOdeDf$median, nrow = nrow(simDf), 
+odeDf = data.frame(matrix(resultsOdeDf$median, nrow = nrow(simDf),
        ncol = length(compartmentNames)))
 colnames(odeDf) = compartmentNames
 odeDf$day = 1:nrow(simDf)
