@@ -9,7 +9,6 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
               real beta,
               real gamma,
               real deathRate,
-              real dI,
               real N) {
 
       // Unpack state
@@ -21,7 +20,7 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
       // derived parameters
       real infection = beta * I * S / N;
       real recovery = gamma * I;
-      real death = deathRate * I * 1/dI;
+      real death = deathRate * I * gamma;
 
       // ODE System
       vector[4] dydt;
@@ -54,9 +53,8 @@ parameters {
   real<lower=0> beta;
   real<lower=0> gamma;
   real<lower=0> death_rate;
-  real<lower=0> dI;
-  real<lower=0.001> phi_inv;
-  real<lower=0.001> phi_twitter_inv;
+  // real<lower=0.001> phi_inv;
+  // real<lower=0.001> phi_twitter_inv;
   real<lower=0, upper=1> proportion_twitter;
   //real<lower=0> lag_twitter;
   real<lower=0> I_noise;
@@ -64,8 +62,8 @@ parameters {
 }
 transformed parameters{
   // I'm not giving up negbin yet
-  real phi = 1.0 / phi_inv;
-  real phi_twitter = 1.0 / phi_twitter_inv;
+  // real phi = 1.0 / phi_inv;
+  // real phi_twitter = 1.0 / phi_twitter_inv;
 
   // States to be recovered
   vector<lower=0>[4] state_estimate[n_days];
@@ -77,10 +75,10 @@ transformed parameters{
 
   // ODE RK45 (Stan's Implementation)
   // state_estimate = ode_rk45(sird, y0, t0, ts,
-  //                           beta, gamma, death_rate, dI, N);
+  //                           beta, gamma, death_rate, N);
   state_estimate = ode_rk45_tol(sird, y0, t0, ts,
                                 1e-6, 1e-6, 1000, // if you want custom tolerances
-                                beta, gamma, death_rate, dI, N);
+                                beta, gamma, death_rate, N);
 
   // Populate States
   state_S = to_vector(state_estimate[, 1]);
@@ -99,9 +97,8 @@ model {
   beta ~ normal(2, 1);
   gamma ~ normal(0.4, 0.5);
   death_rate ~ normal(0.1, 0.1);
-  dI ~ normal(7, 1); // gammaResRateSim = 1 / 7
-  phi_inv ~ exponential(5);
-  phi_twitter_inv ~ exponential(5);
+  // phi_inv ~ exponential(5);
+  // phi_twitter_inv ~ exponential(5);
   proportion_twitter ~ beta(1, 1); // Beta is a better prior for proportions
   //lag_twitter ~ normal(22, 5); // in the future I want to put a lag
 
@@ -112,11 +109,11 @@ model {
   if (compute_likelihood == 1){
     for (i in 1:n_days) {
       if (use_twitter == 1) {
-        symptomaticTweets[i] ~ neg_binomial_2(state_I[i], phi_twitter); // and a incorporate lag
-        // symptomaticTweets[i] ~ normal(proportion_twitter * state_I[i], twitter_noise);
+        // symptomaticTweets[i] ~ neg_binomial_2(state_I[i], phi_twitter); // and a incorporate lag
+        symptomaticTweets[i] ~ normal(proportion_twitter * state_I[i], twitter_noise);
       } else {
-        death_count[i] ~ neg_binomial_2(state_D[i], phi);
-        // death_count[i] ~ normal(state_D[i], I_noise);
+        // death_count[i] ~ neg_binomial_2(state_D[i], phi);
+        death_count[i] ~ normal(state_D[i], I_noise);
       }
     }
   }
@@ -130,7 +127,7 @@ generated quantities {
   vector[4] ode_states[n_days]  = state_estimate;
   for (i in 1:n_days) {
      if (compute_likelihood == 1) {
-          pred_cases[i] = normal_rng(state_D[i], twitter_noise);
+          pred_cases[i] = normal_rng(state_D[i], I_noise);
       }
       if (use_twitter == 1) {
           pred_tweets[i] = normal_rng(proportion_twitter *
