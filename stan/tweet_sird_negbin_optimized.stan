@@ -32,7 +32,7 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
       return dydt;
   }
 
-  vector[] integrate_ode_explicit_trapezoidal(vector initial_state,
+  vector[] ode_explicit_trapezoidal(vector initial_state,
                                             real initial_time,
                                             real[] times,
                                             real beta,
@@ -102,7 +102,7 @@ transformed parameters{
   vector[n_days] state_D;
   // int state_I_int[n_days];
   if (trapezoidal_solver) {
-    state_estimate = integrate_ode_explicit_trapezoidal(y0, t0, ts,
+    state_estimate = ode_explicit_trapezoidal(y0, t0, ts,
                                                          beta, gamma, death_rate, N);
   } else {
     // ODE RK45 (Stan's Implementation)
