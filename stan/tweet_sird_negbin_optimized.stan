@@ -1,8 +1,3 @@
-/*
-Modified from https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html
-
-*/
-
 functions { // ODE new interface see here: https://mc-stan.org/users/documentation/case-studies/convert_odes.html
   vector sird(real time,
               vector y,
@@ -73,10 +68,7 @@ data {
   int<lower=0, upper=1> trapezoidal_solver;
 }
 transformed data {
-  int s_index = 1;
-  int i_index = 2;
-  int r_index = 3;
-  int d_index = 4;
+
 }
 parameters {
   real<lower=0> beta;
@@ -100,7 +92,7 @@ transformed parameters{
   vector[n_days] state_I;
   vector[n_days] state_R;
   vector[n_days] state_D;
-  // int state_I_int[n_days];
+
   if (trapezoidal_solver) {
     state_estimate = ode_explicit_trapezoidal(y0, t0, ts,
                                               beta, gamma, death_rate, N);

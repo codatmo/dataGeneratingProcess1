@@ -95,9 +95,6 @@ simDf %>%
 
 model <- cmdstan_model(here::here("stan", "tweet_sird_negbin_optimized.stan"))
 
-# Code modified from
-# https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html
-
 stan_data <- list(
   n_days = nrow(simDf),
   y0 = c(nPop - infStartValue, infStartValue, 0, 0),
