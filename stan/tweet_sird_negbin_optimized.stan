@@ -103,7 +103,7 @@ transformed parameters{
   // int state_I_int[n_days];
   if (trapezoidal_solver) {
     state_estimate = ode_explicit_trapezoidal(y0, t0, ts,
-                                                         beta, gamma, death_rate, N);
+                                              beta, gamma, death_rate, N);
   } else {
     // ODE RK45 (Stan's Implementation)
     // state_estimate = ode_rk45(sird, y0, t0, ts,
