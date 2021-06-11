@@ -31,6 +31,34 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
 
       return dydt;
   }
+
+  vector[] integrate_ode_explicit_trapezoidal(vector initial_state,
+                                            real initial_time,
+                                            real[] times,
+                                            real beta,
+                                            real gamma,
+                                            real deathRate,
+                                            real N) {
+    real h;
+    vector[size(initial_state)] dstate_dt_initial_time;
+    vector[size(initial_state)] dstate_dt_tidx;
+    vector[size(initial_state)] k;
+    vector[size(initial_state)] state_estimate[size(times)];
+
+    h = times[1] - initial_time;
+    dstate_dt_initial_time = sird(initial_time, initial_state, beta, gamma, deathRate, N);
+    k = h * dstate_dt_initial_time;
+    state_estimate[1,] = initial_state + h * (dstate_dt_initial_time + sird(times[1], initial_state + k, beta, gamma, deathRate, N)) / 2;
+
+    for (tidx in 1:size(times)-1) {
+      h = (times[tidx+1] - times[tidx]);
+      dstate_dt_tidx = sird(times[tidx], state_estimate[tidx], beta, gamma, deathRate, N);
+      k = h * dstate_dt_tidx;
+      state_estimate[tidx+1,] = state_estimate[tidx,] + h * (dstate_dt_tidx + sird(times[tidx+1], state_estimate[tidx,] + k, beta, gamma, deathRate, N))/2;
+    }
+
+    return state_estimate;
+  }
 }
 data {
   int<lower=1> n_days;
@@ -42,6 +70,7 @@ data {
   int symptomaticTweets[n_days];
   int<lower=0, upper=1> compute_likelihood;
   int<lower=0, upper=1> use_twitter;
+  int<lower=0, upper=1> trapezoidal_solver;
 }
 transformed data {
   int s_index = 1;
@@ -72,13 +101,17 @@ transformed parameters{
   vector[n_days] state_R;
   vector[n_days] state_D;
   // int state_I_int[n_days];
-
-  // ODE RK45 (Stan's Implementation)
-  // state_estimate = ode_rk45(sird, y0, t0, ts,
-  //                           beta, gamma, death_rate, N);
-  state_estimate = ode_rk45_tol(sird, y0, t0, ts,
-                                1e-6, 1e-6, 1000, // if you want custom tolerances
-                                beta, gamma, death_rate, N);
+  if (trapezoidal_solver) {
+    state_estimate = integrate_ode_explicit_trapezoidal(y0, t0, ts,
+                                                         beta, gamma, death_rate, N);
+  } else {
+    // ODE RK45 (Stan's Implementation)
+    // state_estimate = ode_rk45(sird, y0, t0, ts,
+    //                           beta, gamma, death_rate, N);
+    state_estimate = ode_rk45_tol(sird, y0, t0, ts,
+                                  1e-6, 1e-6, 1000, // if you want custom tolerances
+                                  beta, gamma, death_rate, N);
+  }
 
   // Populate States
   state_S = to_vector(state_estimate[, 1]);

@@ -105,9 +105,11 @@ stan_data <- list(
   ts = 1:nDays,
   N = nPop,
   death_count = simDf$d,
-  symptomaticTweets =  simDf$tweets,
+  symptomaticTweets = simDf$tweets,
   compute_likelihood = 1,
-  use_twitter = 1)
+  use_twitter = 1,
+  trapezoidal_solver = 1
+)
 
 fit <- model$sample(data = stan_data, output_dir = "output",
                     parallel_chains = 4,
