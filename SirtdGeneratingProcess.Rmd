@@ -1,0 +1,209 @@
+---
+title: "SIRTD Data Generating Processes"
+author: "Breck Baldwin"
+date:  '`r format(Sys.Date(), "%B %d, %Y")`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+  knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+```
+
+# Introduction
+
+This page contains data generating programs for a common class of epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered --SIR models. This page/code adds compartments for (T) terminal and (D) dead counts useful for the grim task of distinguishing the dead from recovered. There is additionally data generated for tweets but that exists in parallel with the core SIRTD model which have to sum to the population at each step so do not particpate in those counts. 
+
+For more explanation about SIR models see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which I found to be a good explanation as well as an excellent introduction to Bayesian approaches using Stan. This is the model I used to fit this data, there is a model reproduction check list at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/). 
+
+# Navigation
+
+This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1/](https://github.com/codatmo/dataGeneratingProcess/) as 'SirtdGeneratingProcess.Rmd' and rendered as 'SirtdGeneratingProcess.html'. 
+
+# Model 
+
+The model simulates a fixed population at the individual level on a daily basis. Larger or smaller uniform units could be used. At a pseudo code level the algorithm is:
+
+```
+nPop = 1000 # population size
+nPatientZero = 10 # how many start infected
+nDailyContacts = 10 # number of daily contacts per day for infected
+betaDailyInfectionRates[nDays] = list of infection rate for each day--can vary
+gammaResolvedDailyRate = rate moving from 'i' to 'r' or 't'
+dailyTweetRateInfected = rate of tweets per person that is 'i'
+meanDaysToDeath = mean of how many days does it take from 't' to 'd'
+Create dayState[nPop] list of all people with state = 's' for susceptible
+
+Patient zeros: set nPatientZero number of dayState list to 'i' for infected
+
+
+tweets[nDay] = count of tweets per day
+
+
+for (day in numberOfDays) {
+  Copy dayState to nextDayState 
+  for (person in 1 to nPop) { # infections
+    if (dayState[person] equals 'i') { # infecting others
+      for (otherPerson in sample(numberDailyContacts, nPop))
+        chanceInfection = betaDailyInfectionRates[day]/numberDailyContacts
+          if (randomChance(person, chanceInfection) == infected and 
+              dayState[otherPerson] equals 's') {
+             nextDayState[otherPerson] = 'i' 
+          }
+    }
+    if (dayState[person] equals 'i') { # recovery or death
+      if (randomChance(person, gammaResolvedDailyRate) == resolved) {
+         if (randomChoice(person, deathRate) == died) {
+            nextDayState[person] = 't' #terminally ill 
+         }
+         else {
+            nextDayState[person] = 'r' # recovered, will not die
+         }
+      }
+    }
+    if (dayState[person] equals 'i') { # do they tweet while infected
+      if (randomChance(person, tweetDailyRateInfected) == tweets) {
+         tweetCountForDay[day] = tweetCountForDay[day] + 1
+      }
+    }
+    if (dayState[person] equals 't') { # does a 't' -> 'd'
+      if (randomChance(person, meanDaysToDeath) == death) {
+          nextDayState[person] = 'd' 
+      } 
+    }
+   dayState = nextDayState # overwrite the current day with the day we just created
+}
+```
+The `randomChance()` function stands in place of many functions like the Bernoulli distribution. But there are many candidates, the source below details the actual choices. 
+
+Actual code below
+
+
+```{r echo=TRUE}
+SirtdVaryBeta = function(runName = runName,
+                         nPop = nPop,
+                         nDays = nDays,
+                         print = PRINT,
+                         betaDailyInfectionRates = betaDailyInfectionRates,
+                         gammaResolvedPerDayRate = gammaResolvedPerDayRate,
+                         deathRate = deathRate,
+                         tweetRateInfected = tweetRateInfected,
+                         nPatientZero = nPatientZero,
+                         meanDaysToDeathFromT = meanDaysToDeathFromT,
+                         nDailyContacts = nDailyContacts) {
+  
+  dayState = c(rep('i',nPatientZero), rep('s', nPop - nPatientZero))
+  tweets = rep(0, nPop)
+  colNames = c('runName', 'day', 's', 'i', 'r', 't', 'd_today', 'd', 'tweets')
+  df = data.frame(matrix(nrow = 0, ncol=length(colNames)))
+  colnames(df) = colNames
+  nextDayState = dayState
+  for (day in 1:nDays) {
+    df[day,] = rep(NA,length(colNames)) #setup data, will cause errors if I miss something
+    df[day,]$runName = runName
+    df[day,]$s=  length(subset(dayState, dayState == 's'))
+    df[day,]$i = length(subset(dayState, dayState == 'i'))
+    df[day,]$r = length(subset(dayState, dayState == 'r'))
+    df[day,]$t = length(subset(dayState, dayState == 't'))
+    df[day,]$d_today = length(subset(dayState, dayState == 'd_today'))
+    df[day,]$d = length(subset(dayState, dayState == 'd'))
+    df[day,]$day = day
+    df[day,]$tweets = sum(tweets)
+    if (print) {
+      cat(
+        sprintf(
+          "Day=%d, susceptible=%d, infected=%d, recovered=%d, terminal=%d, 
+          dead today=%d, dead=%d, tweets=%d, R0=%.2f\n",
+          df[day,]$day, df[day,]$s, df[day,]$i, df[day,]$r, df[day,]$t, df[day,]$d_today,
+          df[day,]$d, df[day,]$tweets, betaDailyInfectionRates[day]/gammaResolvedPerDayRate))
+    }
+    tweets = rep(0, nPop) #start fresh every day, certainly wrong.
+    for (per in 1:nPop) {
+      #end infectious period
+      if (dayState[per] == 'i') {
+        tweets[per] = rbinom(1, 1, tweetRateInfected)
+        if (rbinom(n = 1, size = 1, prob = gammaResolvedPerDayRate) == 1) {
+          if (rbinom(n = 1, size = 1, prob = deathRate) == 1) {
+            nextDayState[per] = 't' 
+          }
+          else {
+            nextDayState[per] = 'r'
+          }
+        }
+      }
+      if (dayState[per] == 't') {
+        if (rbinom(n = 1, size =1, prob = 1/meanDaysToDeathFromT) == 1) {
+          nextDayState[per] = 'd'
+        }
+      }
+    }
+    for (per in 1:nPop) {
+      if (dayState[per] == 'i') {
+        for (otherPer in sample(1:nPop, nDailyContacts)) {
+          if (dayState[otherPer] == 's' &&
+              rbinom(n = 1, size = 1, 
+                     prob = min(betaDailyInfectionRates[day]/nDailyContacts,1.0)) == 1) {
+            nextDayState[otherPer] = 'i'
+          }
+        }
+      }
+    }
+    dayState = nextDayState
+  }
+  return(df)
+}
+
+
+nPop = 10000
+nWeeks = 10
+nDays = nWeeks * 7
+gammaResolvedPerDayRateSim = 1/7
+tweetRateInfected = .5
+deathRateSim = 0.1
+meanDaysToDeathFromT = 10
+
+sdOfBetas = .1 # for time varying model of infectiousness
+betaInfectionRateMeanSim = .3
+betaForWeek = abs(rnorm(nWeeks, betaInfectionRateMeanSim, .2))
+betaDailyInfectionRatesSim = rep(betaForWeek, times = rep(7,nWeeks))
+nPatientZero = 10
+nDailyContacts = 10
+
+
+simDf = SirtdVaryBeta(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE,
+                      betaDailyInfectionRates = betaDailyInfectionRatesSim, 
+                      gammaResolvedPerDayRate = gammaResolvedPerDayRateSim,
+                      tweetRateInfected = tweetRateInfected, 
+                      meanDaysToDeathFromT = meanDaysToDeathFromT,
+                      nPatientZero = nPatientZero, 
+                      nDailyContacts = nDailyContacts,
+                      deathRate = deathRateSim)
+
+```
+
+
+
+## Graph of output
+
+```{r}
+library(tidyverse)
+for (i in 1:nDays) {
+  modelPop = sum(simDf[i, c(-1, -2, -9)])
+  if (modelPop != nPop) {
+    print(sprintf("Non-constant populatin for model, got %d, expected %d"),
+          modelPop, nPop)
+  }
+}
+colnames = colnames(simDf)
+simLongDf = gather(data = simDf, key = "compartmentSim", value = "count",
+                   all_of(colnames[-1:-2]))
+
+plot = ggplot(data = NULL, aes(x = day, y = mean)) +
+  geom_point(data = simLongDf, aes(y = count, color = compartmentSim), size = .5) +
+  labs(y = "sim data in dots",
+       x = "sim days", 
+       caption = paste0("dots for simulated truth, compartment is = ") +
+  theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0))))
+
+print(plot)
+
+```
