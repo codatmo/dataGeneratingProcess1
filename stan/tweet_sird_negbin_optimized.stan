@@ -3,7 +3,7 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
               vector y,
               real beta,
               real gamma,
-              real deathRate,
+              real omega,
               real N) {
 
       // Unpack state
@@ -15,13 +15,13 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
       // derived parameters
       real infection = beta * I * S / N;
       real recovery = gamma * I;
-      real death = deathRate * I * gamma;
+      real death = omega * R;
 
       // ODE System
       vector[4] dydt;
       dydt[1] = -infection;                   // dS
-      dydt[2] = infection - recovery - death; // dI
-      dydt[3] = recovery;                     // dR
+      dydt[2] = infection - recovery;         // dI
+      dydt[3] = recovery - death;             // dR
       dydt[4] = death;                        // dT
 
       return dydt;
@@ -71,20 +71,19 @@ transformed data {
 
 }
 parameters {
-  real<lower=0> beta;
-  real<lower=0> gamma;
-  real<lower=0> death_rate;
-  // real<lower=0.001> phi_inv;
-  // real<lower=0.001> phi_twitter_inv;
+  real<lower=0.001> beta;
+  real<lower=0.001> gamma;
+  real<lower=0.001> omega;
+  real<lower=0.001> phi_inv;
+  real<lower=0.001> phi_twitter_inv;
   real<lower=0, upper=1> proportion_twitter;
-  //real<lower=0> lag_twitter;
+
   real<lower=0> I_noise;
   real<lower=0> twitter_noise;
 }
 transformed parameters{
-  // I'm not giving up negbin yet
-  // real phi = 1.0 / phi_inv;
-  // real phi_twitter = 1.0 / phi_twitter_inv;
+  real phi = 1.0 / phi_inv;
+  real phi_twitter = 1.0 / phi_twitter_inv;
 
   // States to be recovered
   vector<lower=0>[4] state_estimate[n_days];
@@ -95,14 +94,14 @@ transformed parameters{
 
   if (trapezoidal_solver) {
     state_estimate = ode_explicit_trapezoidal(y0, t0, ts,
-                                              beta, gamma, death_rate, N);
+                                              beta, gamma, omega, N);
   } else {
     // ODE RK45 (Stan's Implementation)
     // state_estimate = ode_rk45(sird, y0, t0, ts,
-    //                           beta, gamma, death_rate, N);
+    //                           beta, gamma, omega, N);
     state_estimate = ode_rk45_tol(sird, y0, t0, ts,
                                   1e-6, 1e-6, 1000, // if you want custom tolerances
-                                  beta, gamma, death_rate, N);
+                                  beta, gamma, omega, N);
   }
 
   // Populate States
@@ -111,21 +110,20 @@ transformed parameters{
   state_R = to_vector(state_estimate[, 3]);
   state_D = to_vector(state_estimate[, 4]);
 
-  // We might need this in the future
-  vector[n_days-1] daily_infections;
-  vector[n_days-1] daily_deaths;
-  daily_infections = state_S[:n_days-1] - state_S[2:] + 1E-4;
-  daily_deaths = state_D[2:] - state_D[:n_days-1] + 1E-4; // I had problems with negativity
+  // Daily Stuff
+  vector[n_days] daily_infections;
+  vector[n_days] daily_deaths;
+  daily_infections = append_row(y0[2], to_vector(state_S[:n_days-1] - state_S[2:] + 1E-4));
+  daily_deaths = append_row(y0[4], to_vector(state_D[2:] - state_D[:n_days-1] + 1E-4)); // I had problems with negativity
 }
 model {
   //priors
-  beta ~ normal(2, 1);
-  gamma ~ normal(0.4, 0.5);
-  death_rate ~ normal(0.1, 0.1);
-  // phi_inv ~ exponential(5);
-  // phi_twitter_inv ~ exponential(5);
+  beta ~ normal(0.3, 0.1);
+  gamma ~ normal(0.14, 0.1);
+  omega ~ normal(0.1, 0.1);
+  phi_inv ~ exponential(5);
+  phi_twitter_inv ~ exponential(5);
   proportion_twitter ~ beta(1, 1); // Beta is a better prior for proportions
-  //lag_twitter ~ normal(22, 5); // in the future I want to put a lag
 
   // Compartment Noises
   I_noise ~ normal(0, 20);       // 20 is too high...
@@ -134,11 +132,12 @@ model {
   if (compute_likelihood == 1){
     for (i in 1:n_days) {
       if (use_twitter == 1) {
-        // symptomaticTweets[i] ~ neg_binomial_2(state_I[i], phi_twitter); // and a incorporate lag
-        symptomaticTweets[i] ~ normal(proportion_twitter * state_I[i], twitter_noise);
+        symptomaticTweets[i] ~ neg_binomial_2(proportion_twitter * state_I[i],
+                                              phi_twitter);
+        // symptomaticTweets[i] ~ normal(proportion_twitter * state_I[i], twitter_noise);
       } else {
-        // death_count[i] ~ neg_binomial_2(state_D[i], phi);
-        death_count[i] ~ normal(state_D[i], I_noise);
+        death_count[i] ~ neg_binomial_2(state_D[i], phi);
+        // death_count[i] ~ normal(state_D[i], I_noise);
       }
     }
   }
@@ -147,16 +146,15 @@ model {
 generated quantities {
   real R0 = beta / gamma;
   real recovery_time = 1 / gamma;
-  real pred_cases[n_days];
-  real pred_tweets[n_days];
-  vector[4] ode_states[n_days]  = state_estimate;
+  int pred_deaths[n_days];
+  int pred_tweets[n_days];
   for (i in 1:n_days) {
      if (compute_likelihood == 1) {
-          pred_cases[i] = normal_rng(state_D[i], I_noise);
+          pred_deaths[i] = neg_binomial_2_rng(state_D[i], phi);
       }
       if (use_twitter == 1) {
-          pred_tweets[i] = normal_rng(proportion_twitter *
-                                   state_I[i], I_noise);
+          pred_tweets[i] = neg_binomial_2_rng(proportion_twitter *
+                                   state_I[i], phi_twitter);
       }
   }
 }

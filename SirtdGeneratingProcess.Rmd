@@ -6,22 +6,23 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-  knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+set.seed(4857)
 ```
 
 # Introduction
 
-This page contains data generating programs for a common class of epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered --SIR models. This page/code adds compartments for (T) terminal and (D) dead counts useful for the grim task of distinguishing the dead from recovered. There is additionally data generated for tweets but that exists in parallel with the core SIRTD model which have to sum to the population at each step so do not particpate in those counts. 
+This page contains data generating programs for a common class of epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered --SIR models. This page/code adds compartments for (T) terminal and (D) dead counts useful for the grim task of distinguishing the dead from recovered. There is additionally data generated for tweets but that exists in parallel with the core SIRTD model which have to sum to the population at each step so do not particpate in those counts.
 
-For more explanation about SIR models see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which I found to be a good explanation as well as an excellent introduction to Bayesian approaches using Stan. This is the model I used to fit this data, there is a model reproduction check list at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/). 
+For more explanation about SIR models see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which I found to be a good explanation as well as an excellent introduction to Bayesian approaches using Stan. This is the model I used to fit this data, there is a model reproduction check list at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/).
 
 # Navigation
 
-This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1/](https://github.com/codatmo/dataGeneratingProcess/) as 'SirtdGeneratingProcess.Rmd' and rendered as 'SirtdGeneratingProcess.html'. 
+This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1/](https://github.com/codatmo/dataGeneratingProcess/) as 'SirtdGeneratingProcess.Rmd' and rendered as 'SirtdGeneratingProcess.html'.
 
-# Model 
+# Data Generating Process
 
-The model simulates a fixed population at the individual level on a daily basis. Larger or smaller uniform units could be used. At a pseudo code level the algorithm is:
+The data generating process simulates a fixed population at the individual level on a daily basis. Larger or smaller uniform units could be used. At a pseudo code level the algorithm is:
 
 ```
 nPop = 1000 # population size
@@ -40,20 +41,20 @@ tweets[nDay] = count of tweets per day
 
 
 for (day in numberOfDays) {
-  Copy dayState to nextDayState 
+  Copy dayState to nextDayState
   for (person in 1 to nPop) { # infections
     if (dayState[person] equals 'i') { # infecting others
       for (otherPerson in sample(numberDailyContacts, nPop))
         chanceInfection = betaDailyInfectionRates[day]/numberDailyContacts
-          if (randomChance(person, chanceInfection) == infected and 
+          if (randomChance(person, chanceInfection) == infected and
               dayState[otherPerson] equals 's') {
-             nextDayState[otherPerson] = 'i' 
+             nextDayState[otherPerson] = 'i'
           }
     }
     if (dayState[person] equals 'i') { # recovery or death
       if (randomChance(person, gammaResolvedDailyRate) == resolved) {
          if (randomChoice(person, deathRate) == died) {
-            nextDayState[person] = 't' #terminally ill 
+            nextDayState[person] = 't' #terminally ill
          }
          else {
             nextDayState[person] = 'r' # recovered, will not die
@@ -67,19 +68,19 @@ for (day in numberOfDays) {
     }
     if (dayState[person] equals 't') { # does a 't' -> 'd'
       if (randomChance(person, meanDaysToDeath) == death) {
-          nextDayState[person] = 'd' 
-      } 
+          nextDayState[person] = 'd'
+      }
     }
    dayState = nextDayState # overwrite the current day with the day we just created
 }
 ```
-The `randomChance()` function stands in place of many functions like the Bernoulli distribution. But there are many candidates, the source below details the actual choices. 
+The `randomChance()` function stands in place of many functions like the Bernoulli distribution. But there are many candidates, the source below details the actual choices.
 
 Actual code below
 
 
 ```{r echo=TRUE}
-SirtdVaryBeta = function(runName = runName,
+SirtdVaryBeta <- function(runName = runName,
                          nPop = nPop,
                          nDays = nDays,
                          print = PRINT,
@@ -90,7 +91,7 @@ SirtdVaryBeta = function(runName = runName,
                          nPatientZero = nPatientZero,
                          meanDaysToDeathFromT = meanDaysToDeathFromT,
                          nDailyContacts = nDailyContacts) {
-  
+
   dayState = c(rep('i',nPatientZero), rep('s', nPop - nPatientZero))
   tweets = rep(0, nPop)
   colNames = c('runName', 'day', 's', 'i', 'r', 't', 'd_today', 'd', 'tweets')
@@ -111,7 +112,7 @@ SirtdVaryBeta = function(runName = runName,
     if (print) {
       cat(
         sprintf(
-          "Day=%d, susceptible=%d, infected=%d, recovered=%d, terminal=%d, 
+          "Day=%d, susceptible=%d, infected=%d, recovered=%d, terminal=%d,
           dead today=%d, dead=%d, tweets=%d, R0=%.2f\n",
           df[day,]$day, df[day,]$s, df[day,]$i, df[day,]$r, df[day,]$t, df[day,]$d_today,
           df[day,]$d, df[day,]$tweets, betaDailyInfectionRates[day]/gammaResolvedPerDayRate))
@@ -123,7 +124,7 @@ SirtdVaryBeta = function(runName = runName,
         tweets[per] = rbinom(1, 1, tweetRateInfected)
         if (rbinom(n = 1, size = 1, prob = gammaResolvedPerDayRate) == 1) {
           if (rbinom(n = 1, size = 1, prob = deathRate) == 1) {
-            nextDayState[per] = 't' 
+            nextDayState[per] = 't'
           }
           else {
             nextDayState[per] = 'r'
@@ -140,7 +141,7 @@ SirtdVaryBeta = function(runName = runName,
       if (dayState[per] == 'i') {
         for (otherPer in sample(1:nPop, nDailyContacts)) {
           if (dayState[otherPer] == 's' &&
-              rbinom(n = 1, size = 1, 
+              rbinom(n = 1, size = 1,
                      prob = min(betaDailyInfectionRates[day]/nDailyContacts,1.0)) == 1) {
             nextDayState[otherPer] = 'i'
           }
@@ -170,21 +171,19 @@ nDailyContacts = 10
 
 
 simDf = SirtdVaryBeta(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE,
-                      betaDailyInfectionRates = betaDailyInfectionRatesSim, 
+                      betaDailyInfectionRates = betaDailyInfectionRatesSim,
                       gammaResolvedPerDayRate = gammaResolvedPerDayRateSim,
-                      tweetRateInfected = tweetRateInfected, 
+                      tweetRateInfected = tweetRateInfected,
                       meanDaysToDeathFromT = meanDaysToDeathFromT,
-                      nPatientZero = nPatientZero, 
+                      nPatientZero = nPatientZero,
                       nDailyContacts = nDailyContacts,
                       deathRate = deathRateSim)
 
 ```
 
-
-
 ## Graph of output
 
-```{r}
+```{r, dpi=300}
 library(tidyverse)
 for (i in 1:nDays) {
   modelPop = sum(simDf[i, c(-1, -2, -9)])
@@ -197,13 +196,96 @@ colnames = colnames(simDf)
 simLongDf = gather(data = simDf, key = "compartmentSim", value = "count",
                    all_of(colnames[-1:-2]))
 
-plot = ggplot(data = NULL, aes(x = day, y = mean)) +
+ggplot(data = NULL, aes(x = day, y = mean)) +
   geom_point(data = simLongDf, aes(y = count, color = compartmentSim), size = .5) +
   labs(y = "sim data in dots",
-       x = "sim days", 
+       x = "sim days",
        caption = paste0("dots for simulated truth, compartment is = ") +
-  theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0))))
-
-print(plot)
-
+  theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))) +
+  scale_color_brewer(palette = "Set1")
 ```
+
+# Model
+
+The Susceptible-Infected-Recovered (SIR) (Grinsztajn, Semenova, Margossian & Riou, 2021) model splits the population in three time-dependent compartments: the susceptible, the infected (and infectious), and the recovered (and not infectious) compartments. When a susceptible individual comes into contact with an infectious individual, the former can become infected for some time, and then recover and become immune.
+
+The dynamics are governed by a system of **O**rdinary **D**ifferential **E**quations (ODE):
+
+$$
+\begin{aligned}
+\frac{dS}{dt} &= -\beta  S \frac{I}{N}\\
+\frac{dI}{dt} &= \beta  S  \frac{I}{N} -\gamma  I \\
+\frac{dR}{dt} &= \gamma I -\omega I\\
+\frac{dD}{dt} &= \omega I \\
+\end{aligned}
+$$
+
+
+where:
+* $S(t)$ -- the number of people susceptible to becoming infected (no immunity)
+* $I(t)$ -- the number of people currently infected (and infectious)
+* $R(t)$ -- the number of recovered people (we assume they remain immune indefinitely)
+* $D(t)$ -- the number of recovered people that unfortunately died
+* $\beta$ -- the constant rate of infectious contact between people
+* $\gamma$ -- constant recovery rate of infected individuals
+* $\omega$ -- constant death rate of recovered individuals
+
+```{r, warning=FALSE}
+library(cmdstanr)
+model <- cmdstan_model(here::here("stan", "tweet_sird_negbin_optimized.stan"))
+
+stan_data <- list(
+  n_days = nrow(simDf),
+  y0 = c(nPop - first(simDf$i), first(simDf$i), first(simDf$r), first(simDf$d)),
+  t0 = 0,
+  ts = 1:nDays,
+  N = nPop,
+  death_count = simDf$d,
+  symptomaticTweets = simDf$tweets,
+  compute_likelihood = 1,
+  use_twitter = 1,
+  trapezoidal_solver = 0
+)
+
+fit <- model$sample(data = stan_data, output_dir = "output",
+                    parallel_chains = 4,
+                    chains = 4, seed = 4857)
+```
+
+## Results
+
+```{r}
+stan_variables <- c("beta", "gamma", "omega", "phi_inv", "recovery_time", "R0")
+if (stan_data$use_twitter) {
+   fit$summary(variables = c(stan_variables, "proportion_twitter", "phi_twitter_inv"))
+}else {
+  fit$summary(variables = stan_variables)
+}
+```
+
+```{r, dpi=300}
+daily_infected <- fit$summary("daily_infections")$mean
+pred_deaths <- fit$summary("pred_deaths")$mean
+
+compartmentNames <- c("s", "i", "r", "d")
+
+ode_df <- tibble(
+  day = seq_len(nrow(simDf)),
+  daily_infected,
+  pred_deaths
+)
+ode_long_df <- ode_df %>% pivot_longer(-day, names_to = "compartmentODE", values_to = "mean")
+simLongDf <- gather(data = simDf, key = "compartmentSim", value = "count",
+                   all_of(c("tweets", compartmentNames)))
+
+ggplot(data = NULL, aes(x = day, y = mean)) +
+  geom_line(data = ode_long_df, aes(color = compartmentODE)) +
+  geom_point(data = simLongDf, aes(y = count, color = compartmentSim), size = .5) +
+  labs(y = "median with sim data in dots",
+     caption = "predicted shaded, lines with dots for simulated truth") +
+  theme(legend.position = "bottom")
+```
+
+# References
+
+Grinsztajn, L., Semenova, E., Margossian, C. C., & Riou, J. (2021). Bayesian workflow for disease transmission modeling in Stan. ArXiv:2006.02985 [q-Bio, Stat]. http://arxiv.org/abs/2006.02985
