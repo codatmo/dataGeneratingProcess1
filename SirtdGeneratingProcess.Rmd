@@ -1,6 +1,8 @@
 ---
 title: "SIRTD Data Generating Processes"
-author: "Breck Baldwin"
+author:
+  - "Breck Baldwin"
+  - "Jose Storopoli"
 date:  '`r format(Sys.Date(), "%B %d, %Y")`'
 output: html_document
 ---
@@ -80,6 +82,7 @@ Actual code below
 
 
 ```{r echo=TRUE}
+library(tidyverse)
 SirtdVaryBeta <- function(runName = runName,
                          nPop = nPop,
                          nDays = nDays,
@@ -184,7 +187,6 @@ simDf = SirtdVaryBeta(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE
 ## Graph of output
 
 ```{r, dpi=300}
-library(tidyverse)
 for (i in 1:nDays) {
   modelPop = sum(simDf[i, c(-1, -2, -9)])
   if (modelPop != nPop) {
@@ -214,32 +216,38 @@ The dynamics are governed by a system of **O**rdinary **D**ifferential **E**quat
 $$
 \begin{aligned}
 \frac{dS}{dt} &= -\beta  S \frac{I}{N}\\
-\frac{dI}{dt} &= \beta  S  \frac{I}{N} -\gamma  I \\
-\frac{dR}{dt} &= \gamma I -\omega I\\
-\frac{dD}{dt} &= \omega I \\
+\frac{dI}{dt} &= \beta  S  \frac{I}{N} - \frac{1}{d_I}  I \\
+\frac{dR}{dt} &= \frac{1}{d_I} I \left( 1 - \omega \right) \\
+\frac{dT}{dt} &= \frac{1}{d_I} I \omega - \frac{1}{d_T} T \\
+\frac{dD}{dt} &= \frac{1}{d_T} T
 \end{aligned}
 $$
 
-
 where:
-* $S(t)$ -- the number of people susceptible to becoming infected (no immunity)
-* $I(t)$ -- the number of people currently infected (and infectious)
-* $R(t)$ -- the number of recovered people (we assume they remain immune indefinitely)
-* $D(t)$ -- the number of recovered people that unfortunately died
-* $\beta$ -- the constant rate of infectious contact between people
-* $\gamma$ -- constant recovery rate of infected individuals
-* $\omega$ -- constant death rate of recovered individuals
 
-```{r, warning=FALSE}
+* $S(t)$ is the number of people susceptible to becoming infected (no immunity)
+* $I(t)$ is the number of people currently infected (and infectious)
+* $T(t)$ is the number of terminally ill individuals who have been infected and will die
+* $R(t)$ is the number of removed people (either dead or we assume they remain immune indefinitely)
+* $D(t)$ is the number of recovered people that unfortunately died
+* $N = S(t) + I(t) + R(t) + T(t) + D(t)$ is the constant total number of individuals in the population
+* $\beta$ is the constant rate of contacts between individuals per unit time that are sufficient to lead to transmission if one of the individuals is infectious and the other is susceptible
+* $\omega$ is constant death rate of recovered individuals
+* $d_I$ is the mean time for which individuals are infectious
+* $d_T$  is the mean time for which individuals are terminally ill,
+
+```{r, warning=FALSE, message=FALSE, error=FALSE}
 library(cmdstanr)
 model <- cmdstan_model(here::here("stan", "tweet_sird_negbin_optimized.stan"))
+```
 
+```{r, warning=FALSE}
 stan_data <- list(
   n_days = nrow(simDf),
-  y0 = c(nPop - first(simDf$i), first(simDf$i), first(simDf$r), first(simDf$d)),
+  # S, I, R, T, D
+  y0 = c(nPop - first(simDf$i), first(simDf$i), first(simDf$r), first(simDf$t), first(simDf$d)),
   t0 = 0,
   ts = 1:nDays,
-  N = nPop,
   death_count = simDf$d,
   symptomaticTweets = simDf$tweets,
   compute_likelihood = 1,
@@ -255,7 +263,7 @@ fit <- model$sample(data = stan_data, output_dir = "output",
 ## Results
 
 ```{r}
-stan_variables <- c("beta", "gamma", "omega", "phi_inv", "recovery_time", "R0")
+stan_variables <- c("beta","omega", "dI", "dT", "phi_inv", "R0")
 if (stan_data$use_twitter) {
    fit$summary(variables = c(stan_variables, "proportion_twitter", "phi_twitter_inv"))
 }else {
@@ -264,15 +272,22 @@ if (stan_data$use_twitter) {
 ```
 
 ```{r, dpi=300}
-daily_infected <- fit$summary("daily_infections")$mean
+state_S <- fit$summary("state_S")$mean
+state_I <- fit$summary("state_I")$mean
+state_R <- fit$summary("state_R")$mean
+state_T <- fit$summary("state_T")$mean
+state_D <- fit$summary("state_D")$mean
 pred_deaths <- fit$summary("pred_deaths")$mean
 
-compartmentNames <- c("s", "i", "r", "d")
+compartmentNames <- c("s", "i", "r", "t", "d")
 
 ode_df <- tibble(
   day = seq_len(nrow(simDf)),
-  daily_infected,
-  pred_deaths
+  s = state_S,
+  i = state_I,
+  r = state_R,
+  t = state_T,
+  d = state_D
 )
 ode_long_df <- ode_df %>% pivot_longer(-day, names_to = "compartmentODE", values_to = "mean")
 simLongDf <- gather(data = simDf, key = "compartmentSim", value = "count",
