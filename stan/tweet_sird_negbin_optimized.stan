@@ -102,10 +102,10 @@ transformed parameters{
 }
 model {
   //priors
-  beta ~ normal(0.3, 0.1);
-  omega ~ normal(0.1, 0.1);
-  dI ~ normal(7, 1);
-  dT ~ normal(10, 1);
+  beta ~ normal(2, 1);
+  omega ~ normal(0.4, 0.5);
+  dI ~ normal(7, 2);
+  dT ~ normal(10, 2);
   phi_inv ~ exponential(5);
   phi_twitter_inv ~ exponential(5);
   proportion_twitter ~ beta(1, 1); // Beta is a better prior for proportions

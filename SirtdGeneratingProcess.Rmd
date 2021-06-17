@@ -167,7 +167,7 @@ meanDaysToDeathFromT = 10
 
 sdOfBetas = .1 # for time varying model of infectiousness
 betaInfectionRateMeanSim = .3
-betaForWeek = abs(rnorm(nWeeks, betaInfectionRateMeanSim, .2))
+betaForWeek = abs(rnorm(nWeeks, betaInfectionRateMeanSim, 1e-6))
 betaDailyInfectionRatesSim = rep(betaForWeek, times = rep(7,nWeeks))
 nPatientZero = 10
 nDailyContacts = 10
