@@ -119,11 +119,10 @@ model {
       if (use_twitter == 1) {
         symptomaticTweets[i] ~ neg_binomial_2(proportion_twitter * state_estimate[i, 2],
                                               phi_twitter);
-        // symptomaticTweets[i] ~ normal(proportion_twitter * state_estimate[i, 2], twitter_noise);
-      } else {
-        death_count[i] ~ neg_binomial_2(state_estimate[i, 5], phi);
-        // death_count[i] ~ normal(state_estimate[i, 5], I_noise);
+        // symptomaticTweets ~ normal(proportion_twitter * state_estimate[i, 2], twitter_noise);
       }
+      death_count[i] ~ neg_binomial_2(state_estimate[i, 5], phi);
+      // death_count[i] ~ normal(state_estimate[i, 5], I_noise);
     }
   }
 }
