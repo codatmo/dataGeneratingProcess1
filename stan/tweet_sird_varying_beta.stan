@@ -33,7 +33,6 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
 
     real dS_dt;
     real dI_dt;
-    real dR_dt;
     real dT_dt;
     real dD_dt;
 
@@ -76,7 +75,7 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
 }
 data {
   int<lower=1> n_days;
-  vector[4] y0;
+  real y0[4];
   real t0;
   real ts[n_days];
   int death_count[n_days];
@@ -105,16 +104,12 @@ parameters {
   real<lower=0.001> phi_inv;
   real<lower=0.001> phi_twitter_inv;
   real<lower=0, upper=1> proportion_twitter;
-
-  real<lower=0> I_noise;
-  real<lower=0> twitter_noise;
 }
 transformed parameters{
-  real grad_beta[n_beta_pieces];
-  real gamma;
-  real kappa;
-  real phi = 1.0 / phi_inv;
-  real phi_twitter = 1.0 / phi_twitter_inv;
+  real gamma = 1.0/dI;
+  real kappa = 1.0/dT;
+  real phi = 1.0/phi_inv;
+  real phi_twitter = 1.0/phi_twitter_inv;
 
   real state_estimate[n_days, 4];
   vector[n_days] S;
@@ -122,22 +117,22 @@ transformed parameters{
   vector[n_days] T;
   vector[n_days] D;
 
+  real grad_beta[n_beta_pieces];
   grad_beta = to_array_1d((to_vector(beta_right) - to_vector(beta_left))./(to_vector(beta_right_t) -
               to_vector(beta_left_t)));
-  gamma = 1.0/dI;
-  kappa = 1.0/dT;
 
   // States to be recovered
   {
-    real params[2*n_beta_pieces+4];
+    real params[2*n_beta_pieces+3];
     params[1:n_beta_pieces] = beta_left;
     params[n_beta_pieces+1:2*n_beta_pieces] = grad_beta;
     params[2*n_beta_pieces+1] = gamma;
     params[2*n_beta_pieces+2] = kappa;
     params[2*n_beta_pieces+3] = omega;
 
-    state_estimate = integrate_ode_explicit_trapezoidal(to_array_1d(y0), t0, ts, params, real_data, integer_data);
+    state_estimate = integrate_ode_explicit_trapezoidal(y0, t0, ts, params, real_data, integer_data);
   }
+
   S = to_vector(state_estimate[, 1]);
   I = to_vector(state_estimate[, 2]);
   T = to_vector(state_estimate[, 3]);

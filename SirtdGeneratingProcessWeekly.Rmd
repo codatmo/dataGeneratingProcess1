@@ -237,9 +237,9 @@ where:
 * $\beta (t)$ is the mean rate of contacts between individuals per unit time that are sufficient to lead to transmission if one of the individuals is infectious and the other is susceptible
 * $\omega$ is constant death rate of recovered individuals
 * $d_I$ is the mean time for which individuals are infectious
-* $d_T$  is the mean time for which individuals are terminally ill,
+* $d_T$  is the mean time for which individuals are terminally ill
 
-```{r, warning=FALSE, message=FALSE, error=FALSE}
+```{r, warning=FALSE, message=FALSE, error=FALSE, print=FALSE}
 library(cmdstanr)
 model <- cmdstan_model(here::here("stan", "tweet_sird_varying_beta.stan"))
 ```
@@ -253,10 +253,10 @@ integer_data_length <- 2
 integer_data <- c(nDays, nWeeks)
 stan_data <- list(
   n_days = nDays,
-  y0 = c(nPop - first(simDf$i), first(simDf$i), first(simDf$t), first(simDf$d)),
+  #      S                      I               T               D
+  y0 = c(nPop - first(simDf$i), first(simDf$i), first(simDf$t)+0.001, first(simDf$d)+0.001),
   t0 = 0,
   ts = seq_len(nDays),
-  i_0 = first(simDf$i),
   death_count = simDf$d,
   symptomaticTweets = simDf$tweets,
   n_beta_pieces = nWeeks,
@@ -279,30 +279,23 @@ fit <- model$sample(data = stan_data, output_dir = "output",
 
 ```{r}
 # betas
-fit$summary("beta") %>%
-  summarise(
-    variable = "beta",
-    mean = mean(mean),
-    median = median(median),
-    sd = stats::sd(mean),
-    mad = stats::mad(median)
-    )
+fit$summary(c("beta_left", "beta_right"))
 
 # effective_reproduction_number
-stan_variables <- c("omega", "dI", "dT", "reciprocal_phi_deaths")
+stan_variables <- c("omega", "dI", "dT", "phi")
 if (stan_data$use_twitter) {
-   fit$summary(variables = c(stan_variables, "proportion_twitter", "reciprocal_phi_twitter"))
+   fit$summary(variables = c(stan_variables, "proportion_twitter", "phi_twitter_inv"))
 }else {
   fit$summary(variables = stan_variables)
 }
 ```
 
 ```{r, dpi=300}
-state_S <- fit$summary("state_S")$mean
-state_I <- fit$summary("state_I")$mean
-state_T <- fit$summary("state_T")$mean
-state_D <- fit$summary("state_D")$mean
-pred_deaths <- fit$summary("pred_daily_deaths")$mean
+state_S <- fit$summary("S")$mean
+state_I <- fit$summary("I")$mean
+state_T <- fit$summary("T")$mean
+state_D <- fit$summary("D")$mean
+pred_deaths <- fit$summary("pred_deaths")$mean
 
 compartmentNames <- c("s", "i", "t", "d")
 
