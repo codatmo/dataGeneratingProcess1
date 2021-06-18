@@ -234,7 +234,7 @@ where:
 * $\beta$ is the constant rate of contacts between individuals per unit time that are sufficient to lead to transmission if one of the individuals is infectious and the other is susceptible
 * $\omega$ is constant death rate of recovered individuals
 * $d_I$ is the mean time for which individuals are infectious
-* $d_T$  is the mean time for which individuals are terminally ill,
+* $d_T$  is the mean time for which individuals are terminally ill
 
 ```{r, warning=FALSE, message=FALSE, error=FALSE}
 library(cmdstanr)
@@ -263,7 +263,7 @@ fit <- model$sample(data = stan_data, output_dir = "output",
 ## Results
 
 ```{r}
-stan_variables <- c("beta","omega", "dI", "dT", "phi_inv", "R0")
+stan_variables <- c("beta", "omega", "dI", "dT", "phi_inv", "R0")
 if (stan_data$use_twitter) {
    fit$summary(variables = c(stan_variables, "proportion_twitter", "phi_twitter_inv"))
 }else {
@@ -278,6 +278,7 @@ state_R <- fit$summary("state_R")$mean
 state_T <- fit$summary("state_T")$mean
 state_D <- fit$summary("state_D")$mean
 pred_deaths <- fit$summary("pred_deaths")$mean
+pred_tweets <- fit$summary("pred_tweets")$mean
 
 compartmentNames <- c("s", "i", "r", "t", "d")
 
@@ -287,7 +288,8 @@ ode_df <- tibble(
   i = state_I,
   r = state_R,
   t = state_T,
-  d = state_D
+  d = state_D,
+  tweets = pred_tweets
 )
 ode_long_df <- ode_df %>% pivot_longer(-day, names_to = "compartmentODE", values_to = "mean")
 simLongDf <- gather(data = simDf, key = "compartmentSim", value = "count",

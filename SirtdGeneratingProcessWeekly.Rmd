@@ -190,13 +190,6 @@ simDf <- simDf %>% mutate(d_today = coalesce(d - lag(d), 0))
 ## Graph of output
 
 ```{r, dpi=300}
-for (i in 1:nDays) {
-  modelPop = sum(simDf[i, c(-1, -2, -9)])
-  if (modelPop != nPop) {
-    print(sprintf("Non-constant populatin for model, got %d, expected %d"),
-          modelPop, nPop)
-  }
-}
 colnames = colnames(simDf)
 simLongDf = gather(data = simDf, key = "compartmentSim", value = "count",
                    all_of(colnames[-1:-2]))
@@ -246,7 +239,7 @@ model <- cmdstan_model(here::here("stan", "tweet_sird_varying_beta.stan"))
 
 ```{r, warning=FALSE}
 beta_left_t <- (seq_len(nWeeks) - 1) * 7
-beta_right_t <- seq_len(nWeeks) * 7
+beta_right_t <- c(beta_left_t[2:nWeeks], nWeeks * 7 + 1)
 real_data_length <- length(beta_left_t) + length(beta_right_t) + 1
 real_data <- c(beta_left_t, beta_right_t, nPop)
 integer_data_length <- 2
@@ -255,7 +248,7 @@ stan_data <- list(
   n_days = nDays,
   #      S                      I               T               D
   y0 = c(nPop - first(simDf$i), first(simDf$i), first(simDf$t)+0.001, first(simDf$d)+0.001),
-  t0 = 0,
+  t0 = 1,
   ts = seq_len(nDays),
   death_count = simDf$d,
   symptomaticTweets = simDf$tweets,
@@ -284,7 +277,7 @@ fit$summary(c("beta_left", "beta_right"))
 # effective_reproduction_number
 stan_variables <- c("omega", "dI", "dT", "phi")
 if (stan_data$use_twitter) {
-   fit$summary(variables = c(stan_variables, "proportion_twitter", "phi_twitter_inv"))
+   fit$summary(variables = c(stan_variables, "proportion_twitter", "sigma_twitter_noise"))
 }else {
   fit$summary(variables = stan_variables)
 }
@@ -295,7 +288,8 @@ state_S <- fit$summary("S")$mean
 state_I <- fit$summary("I")$mean
 state_T <- fit$summary("T")$mean
 state_D <- fit$summary("D")$mean
-pred_deaths <- fit$summary("pred_deaths")$mean
+# pred_deaths <- fit$summary("pred_deaths")$mean
+pred_tweets <- fit$summary("pred_tweets")$mean
 
 compartmentNames <- c("s", "i", "t", "d")
 
@@ -304,7 +298,8 @@ ode_df <- tibble(
   s = state_S,
   i = state_I,
   t = state_T,
-  d = state_D
+  d = state_D,
+  tweets = pred_tweets
 )
 ode_long_df <- ode_df %>% pivot_longer(-day, names_to = "compartmentODE", values_to = "mean")
 simLongDf <- gather(data = simDf, key = "compartmentSim", value = "count",
@@ -315,7 +310,8 @@ ggplot(data = NULL, aes(x = day, y = mean)) +
   geom_point(data = simLongDf, aes(y = count, color = compartmentSim), size = .5) +
   labs(y = "median with sim data in dots",
      caption = "predicted shaded, lines with dots for simulated truth") +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom") +
+    scale_color_brewer(palette = "Set1")
 ```
 
 # References
