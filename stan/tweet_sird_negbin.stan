@@ -87,10 +87,11 @@ data {
 transformed data {
   real x_r[0]; //need for ODE function
   int x_i[1] = { N }; //need for ODE function
-  //y0
+
   //compartmentDays
   //sd
   //mean
+  print("compiled");  
   print("compartment=", compartment);
 }
 parameters {
@@ -113,7 +114,7 @@ transformed parameters{
   theta[1] = beta;
   theta[2] = gamma;
   theta[3] = deaths;
-  //y = integrate_ode_rk45(sird, y0, t0, ts, theta, x_r, x_i);
+//  y = integrate_ode_rk45(sird, y0, t0, ts, theta, x_r, x_i);
   y = my_sird(n_days, y0, theta, x_r, x_i);
   daily_counts_ODE = to_matrix(y);
   //if (check_ODE ==1 && sum(daily_counts_ODE) - n_days * N < 2) {
