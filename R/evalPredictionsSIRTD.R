@@ -189,12 +189,12 @@ for (i in 1:nrow(runDf)) {
   
   predCasesDf = fit$summary(variables = c('pred_deaths'), mean,
                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                      na.rm = TRUE))
+                                      na.rm = TRUE))  #set to FALSE when Jose fixes his model
   predCasesDf$day = 1:nrow(predCasesDf)
   
   predTweetsDf = fit$summary(variables = c('pred_tweets'), mean,
                              ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                       na.rm = TRUE))
+                                       na.rm = TRUE))  #set to FALSE when Jose fixes his model
   predTweetsDf$day = 1:nrow(predTweetsDf)
   
   runDf[i,]$casesInInterval = countPredInInterval(truth = simDf$d,
