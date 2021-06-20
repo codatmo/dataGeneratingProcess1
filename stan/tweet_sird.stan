@@ -130,7 +130,7 @@ generated quantities {
   real recovery_time = 1 / gamma;
   vector[n_days] actual_cases = col(compartmentDaysM, compartment);
   vector[n_days] actual_tweets = col(compartmentDaysM, tweetIndex);
-  real pred_cases[n_days];
+  real pred_deaths[n_days];
   real pred_tweets[n_days];
   real pred_i[n_days];
   matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
@@ -140,7 +140,10 @@ generated quantities {
                                    daily_counts_ODE[i, tweetSourceIndex],
                                    sigma_twitter_noise);
       }
-      pred_cases[i] = normal_rng(daily_counts_ODE[i, compartment], 
+      else {
+        pred_tweets[i] = -100000;
+      }
+      pred_deaths[i] = normal_rng(daily_counts_ODE[i, compartment], 
                                  sigma_compartment_noise);
   }
 }
