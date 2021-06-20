@@ -86,7 +86,7 @@ transformed parameters{
   real phi_twitter = 1.0 / phi_twitter_inv;
 
   // States to be recovered
-  vector<lower=0>[5] state_estimate[n_days];
+  vector[5] state_estimate[n_days];
 
   if (trapezoidal_solver) {
     state_estimate = ode_explicit_trapezoidal(y0, t0, ts,
@@ -142,16 +142,22 @@ generated quantities {
   state_T = to_vector(state_estimate[, 4]);
   state_D = to_vector(state_estimate[, 5]);
 
+  // Tweets
+  vector[n_days] state_tweets;
+  for (i in 1:n_days) {
+    state_tweets[i] = proportion_twitter * state_I[i];
+  }
+
   real R0 = beta * dI;
   int pred_deaths[n_days];
   int pred_tweets[n_days];
   for (i in 1:n_days) {
      if (compute_likelihood == 1) {
-          pred_deaths[i] = neg_binomial_2_rng(state_estimate[i, 5], phi);
+          pred_deaths[i] = neg_binomial_2_rng(state_D[i], phi);
       }
       if (use_twitter == 1) {
           pred_tweets[i] = neg_binomial_2_rng(proportion_twitter *
-                                   state_estimate[i, 2], phi_twitter);
+                                   state_I[i], phi_twitter);
       }
   }
 }
