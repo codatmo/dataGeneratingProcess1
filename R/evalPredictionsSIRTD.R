@@ -43,13 +43,13 @@ paramsForUnitTest <- function(runDf, i, seed, nPop, nDays, nDailyContacts,
    )
 }
 
-countPredInInterval <- function(fitActualDf = fitActualDf, fitPredDf = fitPredDf,
+countPredInInterval <- function(truth = truth, fitPredDf = fitPredDf,
                                 maxQuantileLabel = maxQuantileLabel,
                                 minQuantileLabel = minQuantileLabel) {
   actualsCovered = 0
-  for (day in 1:nrow(fitActualDf)) {
-    if (fitActualDf[1,]$mean <= fitPredDf[day,][[maxQuantileLabel]] &&
-        fitActualDf[1,]$mean >= fitPredDf[day,][[minQuantileLabel]]) {
+  for (day in 1:length(truth)) {
+    if (truth[day] <= fitPredDf[day,][[maxQuantileLabel]] &&
+        truth[day] >= fitPredDf[day,][[minQuantileLabel]]) {
       actualsCovered = actualsCovered + 1
     }
   }
@@ -62,7 +62,7 @@ set.seed(seed)
 nPop <- 10000
 nWeeks <- 10
 nDays <- nWeeks * 7
-nSims <- 2
+nSims <- 1
 
 runDf <- data.frame(runId = c(1:nSims))
 runDf$tweetsInInterval <- rep(NA, nSims)
@@ -84,6 +84,10 @@ runDf$nPop <- rep(nPop, nSims)
 runDf$nDays <- rep(nDays, nSims)
 runDf$compute_likelihood <- rep(1, nSims)
 runDf$seed <- rep(seed,nSims)
+runDf$model_to_run <- rep('tweet_sirtd', nSims)
+
+runOptimizedDf <- runDf
+runOptimizedDf$model_to_run <- 'tweet_sird_negbin_optimized'
 
 run_rk45 = runDf
 run_rk45$run_rk45_ODE = 1
@@ -95,8 +99,7 @@ run_no_twitter$run_rk45_ODE = 0
 run_no_twitter$run_block_ODE = 1
 #should run same dgp output on varied configs, there is some randomness in there
 
-
-runDf = rbind(runDf,run_rk45,run_no_twitter)
+runDf = rbind(runDf, runOptimizedDf)
 
 for (i in 1:nrow(runDf)) {
   betaForWeek = abs(rnorm(nWeeks, runDf[i,]$betaMean, runDf[i,]$sdBeta))
@@ -124,79 +127,89 @@ for (i in 1:nrow(runDf)) {
 
   simData <- matrix(data = c(simDf$s, simDf$i, simDf$r, simDf$d,
                           simDf$tweets),
-                 nrow = nrow(simDf), ncol = 5)
-	# compartment = 4
-  # tweetSourceIndex <- 2
-  # stan_data <- list(n_days = runDf[i,]$nDays,
-  #                 y0 = c(runDf[i,]$nPop - runDf[i,]$nPatientZero, runDf[i,]$nPatientZero, 0, 0),
-  #                 t0 = 0,
-  #                 ts = 1:runDf[i,]$nDays,
-  #                 N =runDf[i,]$ nPop,
-  #                 n_compartments = ncol(simData) - 1,
-  #                 nDataCols = ncol(simData),
-  #                 compartmentDays = simData,
-  #                 compartment = compartment,
-  #                 tweetIndex = 5,
-  #                 tweetSourceIndex = tweetSourceIndex,
-  #                 compute_likelihood = runDf[i,]$compute_likelihood,
-  #                 run_twitter = runDf[i,]$run_twitter,
-  #                 run_block_ODE = runDf[i,]$run_block_ODE,
-  #                 run_rk45_ODE =runDf[i,]$run_rk45_ODE)
+                    nrow = nrow(simDf), ncol = 5)
+  fit <- NA
+  if (runDf[i,]$model_to_run == 'tweet_sirtd') {
+      compartment = 4
+      tweetSourceIndex <- 2
+      
+      stan_data <- list(n_days = runDf[i,]$nDays,
+      y0 = c(runDf[i,]$nPop - runDf[i,]$nPatientZero, runDf[i,]$nPatientZero, 0, 0),
+      t0 = 0,
+      ts = 1:runDf[i,]$nDays,
+      N =runDf[i,]$ nPop,
+      n_compartments = ncol(simData) - 1,
+      nDataCols = ncol(simData),
+      compartmentDays = simData,
+      compartment = compartment,
+      tweetIndex = 5,
+      tweetSourceIndex = tweetSourceIndex,
+      compute_likelihood = runDf[i,]$compute_likelihood,
+      run_twitter = runDf[i,]$run_twitter,
+      run_block_ODE = runDf[i,]$run_block_ODE,
+      run_rk45_ODE =runDf[i,]$run_rk45_ODE)
 
-	# 	  model <- cmdstan_model(here::here("stan", "tweet_sird.stan"))
+	 	  model <- cmdstan_model(here::here("stan", "tweet_sird.stan"))
 
-      # fit <- model$sample(data=stan_data,
-      #               parallel_chains = 4,
-      #               iter_warmup = 1000,
-      #               iter_sampling = 1000,
-      #               chains = 4,
-      #               seed = 4857)
+      fit <- model$sample(data=stan_data,
+                     parallel_chains = 4,
+                     iter_warmup = 1000,
+                     iter_sampling = 1000,
+                     chains = 4,
+                     seed = 4857)
+      }
 
-      stan_data_2 <- list(n_days = nrow(simDf),
-                        y0 = c(nPop - runDf[i,]$nPatientZero, runDf[i,]$nPatientZero, 0, 0, 0), # one more zero here
+      if (runDf[i,]$model_to_run == 'tweet_sird_negbin_optimized') {
+          stan_data_2 <- list(n_days = nrow(simDf),
+                        y0 = c(runDf[i,]$nPop - runDf[i,]$nPatientZero, runDf[i,]$nPatientZero, 0, 0, 0), # one more zero here
                         t0 = 0,
-                        ts = 1:nDays,
-                        compute_likelihood = 1,
-                        use_twitter = 1, # it is now use_twitter
+                        ts = 1:runDf[i,]$nDays,
+                        compute_likelihood = runDf[i,]$compute_likelihood,
+                        use_twitter = runDf[i,]$run_twitter,
                         death_count = simDf$d,
                         symptomaticTweets = simDf$tweets,
                         trapezoidal_solver = 0)
 
-      model2 <- cmdstan_model(here::here("stan", "tweet_sird_negbin_optimized.stan"))
+          model2 <- cmdstan_model(here::here("stan", "tweet_sird_negbin_optimized.stan"))
 
-      fit2 <- model2$sample(data=stan_data_2,
+          fit <- model2$sample(data=stan_data_2,
                           parallel_chains = 4,
                           iter_warmup = 1000,
                           iter_sampling = 1000,
                           chains = 4,
                           seed = 4857)
-
-      minQuantile = .2
-      maxQuantile = .8
-      minQuantileLabel = '20%'
-      maxQuantileLabel = '80%'
-
-      predCasesDf = fit2$summary(variables = c('pred_deaths'), mean,
-                                ~quantile(.x, probs = c(minQuantile, maxQuantile)))
-      predCasesDf$day = 1:nrow(predCasesDf)
-
-      predTweetsDf = fit2$summary(variables = c('pred_tweets'), mean,
-                                 ~quantile(.x, probs = c(minQuantile, maxQuantile)))
-      predTweetsDf$day = 1:nrow(predTweetsDf)
-
-      runDf[i,]$casesInInterval = countPredInInterval(fitActualDf =
-                                           fit2$summary(variables =
-                                                         c('state_D'), mean),
-                                         fitPredDf = predCasesDf,
-                                         maxQuantileLabel = maxQuantileLabel,
-                                         minQuantileLabel = minQuantileLabel)
-
-      runDf[i,]$tweetsInInterval = countPredInInterval(fitActualDf =
-                                            fit2$summary(variables =
-                                                          c('state_tweets'), mean),
-                                         fitPredDf = predTweetsDf,
-                                         maxQuantileLabel = maxQuantileLabel,
-                                         minQuantileLabel = minQuantileLabel)
+      }
+  
+  minQuantile = .2
+  maxQuantile = .8
+  minQuantileLabel = '20%'
+  maxQuantileLabel = '80%'
+  
+  
+  
+  predCasesDf = fit$summary(variables = c('pred_deaths'), mean,
+                            ~quantile(.x, probs = c(minQuantile, maxQuantile),
+                                      na.rm = TRUE))
+  predCasesDf$day = 1:nrow(predCasesDf)
+  
+  predTweetsDf = fit$summary(variables = c('pred_tweets'), mean,
+                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
+                                       na.rm = TRUE))
+  predTweetsDf$day = 1:nrow(predTweetsDf)
+  
+  runDf[i,]$casesInInterval = countPredInInterval(truth = simDf$d,
+                                                  fitPredDf = predCasesDf,
+                                                  maxQuantileLabel = maxQuantileLabel,
+                                                  minQuantileLabel = minQuantileLabel)
+  
+  runDf[i,]$tweetsInInterval = countPredInInterval(truth = simDf$tweets,
+                                                   fitPredDf = predTweetsDf,
+                                                   maxQuantileLabel = maxQuantileLabel,
+                                                   minQuantileLabel = minQuantileLabel)
+  
+  
+  
+      
 
       predCasesLine = 'predicted cases'
       predCasesRibbon = paste0('predicted cases ',minQuantileLabel, '/',
