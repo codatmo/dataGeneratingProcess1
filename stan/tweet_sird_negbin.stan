@@ -22,12 +22,12 @@ functions {
       real dR_dt =  gamma * I - deathRate * R;
       real dD_dt =  deathRate * R; 
  
-      print("t=", t);
+  /*    print("t=", t);
       print("SIRD=", y);
       print("beta, gamma, deathRate", theta);
       print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt},
             " sum=", sum({dS_dt, dI_dt, dR_dt, dD_dt}));
-  
+  */
       return {dS_dt, dI_dt, dR_dt, dD_dt};
   }
 
@@ -88,9 +88,7 @@ transformed data {
   real x_r[0]; //need for ODE function
   int x_i[1] = { N }; //need for ODE function
 
-  //compartmentDays
-  //sd
-  //mean
+  matrix[n_days, n_compartments] compartmentDaysM = to_matrix(compartmentDays);
   print("compiled");  
   print("compartment=", compartment);
 }
@@ -170,6 +168,8 @@ model {
 generated quantities {
   real R0 = beta / gamma;
   real recovery_time = 1 / gamma;
+  vector[n_days] actual_cases = col(compartmentDaysM, compartment);
+  vector[n_days] actual_tweets = col(compartmentDaysM, tweetIndex);
   real pred_cases[n_days];
   real pred_tweets[n_days];
   real pred_i[n_days];
