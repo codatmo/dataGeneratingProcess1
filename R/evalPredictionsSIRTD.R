@@ -83,8 +83,22 @@ runDf$run_twitter <- rep(1, nSims)
 runDf$nPop <- rep(nPop, nSims)
 runDf$nDays <- rep(nDays, nSims)
 runDf$compute_likelihood <- rep(1, nSims)
+runDf$seed <- rep(seed,nSims)
 
-for (i in 1:nSims) {
+run_rk45 = runDf
+run_rk45$run_rk45_ODE = 1
+run_rk45$run_block_ODE = 0
+
+run_no_twitter = runDf
+run_no_twitter$run_twitter = 0
+run_no_twitter$run_rk45_ODE = 0
+run_no_twitter$run_block_ODE = 1
+#should run same dgp output on varied configs, there is some randomness in there
+
+
+runDf = rbind(runDf,run_rk45,run_no_twitter)
+
+for (i in 1:nrow(runDf)) {
   betaForWeek = abs(rnorm(nWeeks, runDf[i,]$betaMean, runDf[i,]$sdBeta))
   runDf[i,]$betaInfRatePerDay = list(rep(betaForWeek, times = rep(7,nWeeks)))
   summary = sprintf("%d, B=%.2f, Bsd=%.2f, G=%.2f, D=%.2f, #D =%.2f, T=%.2f",runDf[i,]$runId, 
@@ -95,7 +109,7 @@ for (i in 1:nSims) {
   if (FALSE) {
     cat(paramsForUnitTest(runDf, i, seed, nPop, nDays))
   }
-  
+  set.seed(seed)
   simDf = SirtdVaryBeta(runName = runDf[i,]$runId, 
                         nPop = runDf[i,]$nPop, 
                         nDays = runDf[i,]$nDays, 
