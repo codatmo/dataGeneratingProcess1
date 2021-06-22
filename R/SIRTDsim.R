@@ -39,7 +39,7 @@ SirtdVaryBeta <- function(runName = runName,
     for (per in 1:nPop) {
       #end infectious period
       if (dayState[per] == 'i') {
-        tweets[per] = round(rnorm(1, tweetRateInfected, .01))
+        tweets[per] = as.integer(rbernoulli(1, tweetRateInfected))
         if (rbinom(n = 1, size = 1, prob = gammaResolvedPerDayRate) == 1) {
           if (rbinom(n = 1, size = 1, prob = deathRate) == 1) {
             nextDayState[per] = 't'
@@ -60,7 +60,7 @@ SirtdVaryBeta <- function(runName = runName,
         for (otherPer in sample(1:nPop, nDailyContacts)) {
           if (dayState[otherPer] == 's' &&
               rbinom(n = 1, size = 1,
-                     prob = min(betaDailyInfectionRates[day]/nDailyContacts,1.0)) == 1) {
+                     prob = min(betaDailyInfectionRates[day],1.0)) == 1) {
             nextDayState[otherPer] = 'i'
           }
         }

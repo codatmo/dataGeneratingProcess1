@@ -24,34 +24,6 @@ functions { // ODE new interface see here: https://mc-stan.org/users/documentati
 
       return dydt;
   }
-
-  vector[] ode_explicit_trapezoidal(vector initial_state,
-                                    real initial_time,
-                                    real[] times,
-                                    real beta,
-                                    real omega,
-                                    real dI,
-                                    real dT) {
-    real h;
-    vector[size(initial_state)] dstate_dt_initial_time;
-    vector[size(initial_state)] dstate_dt_tidx;
-    vector[size(initial_state)] k;
-    vector[size(initial_state)] state_estimate[size(times)];
-
-    h = times[1] - initial_time;
-    dstate_dt_initial_time = sird(initial_time, initial_state, beta, omega, dI, dT);
-    k = h * dstate_dt_initial_time;
-    state_estimate[1,] = initial_state + h * (dstate_dt_initial_time + sird(times[1], initial_state + k, beta, omega, dI, dT)) / 2;
-
-    for (tidx in 1:size(times)-1) {
-      h = (times[tidx+1] - times[tidx]);
-      dstate_dt_tidx = sird(times[tidx], state_estimate[tidx], beta, omega, dI, dT);
-      k = h * dstate_dt_tidx;
-      state_estimate[tidx+1,] = state_estimate[tidx,] + h * (dstate_dt_tidx + sird(times[tidx+1], state_estimate[tidx,] + k, beta, omega, dI, dT))/2;
-    }
-
-    return state_estimate;
-  }
 }
 data {
   int<lower=1> n_days;
@@ -62,7 +34,6 @@ data {
   int symptomaticTweets[n_days];
   int<lower=0, upper=1> compute_likelihood;
   int<lower=0, upper=1> use_twitter;
-  int<lower=0, upper=1> trapezoidal_solver;
 }
 transformed data {
   // if necessary
@@ -88,17 +59,9 @@ transformed parameters{
   // States to be recovered
   vector[5] state_estimate[n_days];
 
-  if (trapezoidal_solver) {
-    state_estimate = ode_explicit_trapezoidal(y0, t0, ts,
-                                              beta, omega, dI, dT);
-  } else {
-    // ODE RK45 (Stan's Implementation)
-    // state_estimate = ode_rk45(sird, y0, t0, ts,
-    //                           beta, omega, dI, dT);
-    state_estimate = ode_rk45_tol(sird, y0, t0, ts,
-                                  1e-6, 1e-6, 1000, // if you want custom tolerances
-                                  beta, omega, dI, dT);
-  }
+  state_estimate = ode_rk45_tol(sird, y0, t0, ts,
+                                1e-6, 1e-6, 1000, // if you want custom tolerances
+                                beta, omega, dI, dT);
 }
 model {
   //priors
@@ -108,7 +71,7 @@ model {
   dT ~ normal(10, 2);
   phi_inv ~ exponential(5);
   phi_twitter_inv ~ exponential(5);
-  proportion_twitter ~ beta(1, 1); // Beta is a better prior for proportions
+  proportion_twitter ~ beta(1, 2); // Beta is a better prior for proportions
 
   // Compartment Noises
   I_noise ~ normal(0, 20);       // 20 is too high...
