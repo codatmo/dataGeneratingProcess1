@@ -48,9 +48,6 @@ parameters {
   real<lower=0.001> phi_inv;
   real<lower=0.001> phi_twitter_inv;
   real<lower=0, upper=1> proportion_twitter;
-
-  real<lower=0> I_noise;
-  real<lower=0> twitter_noise;
 }
 transformed parameters{
   real phi = 1.0 / phi_inv;
