@@ -41,10 +41,10 @@ betaInfRatePerDayList <- list(rep(simRunDf$betaMean, nDays))
 simRunDf$betaInfRatePerDay <- rep(betaInfRatePerDayList, nSims)
 
 # Run config params, for each runDf set, alter config and add
-simRunDf$description <- 'sim, block ode with twitter'
-simRunDf$odeSolver <- 'block'
-simRunDf$runTwitter <- 1
-simRunDf$modelToRun <- 'twitter_sird'
+simRunDf$description <- 'simulation only'
+simRunDf$odeSolver <- NA
+simRunDf$runTwitter <- NA
+simRunDf$modelToRun <- 'none'
 
 runDf = simRunDf
 
@@ -133,12 +133,26 @@ for (i in 1:nrow(runDf)) {
                           seed = 4857)
       }
     else {
-      print(sprintf("no model selected, got:",runDf[i,]$modelToRun));
+      print(sprintf("no model selected, got:'%s'",runDf[i,]$modelToRun));
   }
-
-  if (loadSim && TRUE) {
+  compartmentNames = c('s','i','r','d');
+  if (loadSim && runDf[i,]$modelToRun == 'none') {
+    simLongDf = gather(data = simDf, key = "compartmentSim", value = "count",
+                       all_of(c('tweets', compartmentNames)))
+    
+    plot = ggplot(data = NULL, aes(x = day, y = nPop * mean)) +
+      geom_line(data = simLongDf, linetype = 'dotted', aes(y = count * reduction, 
+                                       color = compartmentSim)) +
+      labs(y = "sim data in dots",
+           caption = paste0("lines with dots for simulated truth") +
+      theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0))))
+    
+    print(plot)
+  }
+  
+  if (loadSim && FALSE) {
     resultsOdeDf = fit$summary(variables = c('ode_states'))
-    compartmentNames = c('s','i','r','d');
+    
     tweetSourceName = compartmentNames[2]
     odeDf = data.frame(matrix(resultsOdeDf$median, nrow = nrow(simDf),
                               ncol = length(compartmentNames)))
