@@ -2,8 +2,65 @@ library(testthat)
 
 source(here::here('R','SIRTDsim.R'))
 
+
+test_that("Tweet test", {
+    nPop <- 210147125
+    nDays <- 311
+    nSims <- 1
+    nConfigs <- 1
+    runDf <- data.frame(runId = NA)
+    runDf$description <- NA
+    runDf$tweetsEvalInInterval <- NA
+    runDf$casesEvalInInterval <- NA
+    runDf$odeSolver <- NA
+    runDf$runTwitter <- NA
+    runDf$nPop <- nPop
+    runDf$nDays <- nDays
+    runDf$seed <- 23454
+    runDf$modelToRun <- NA
+    runDf$compute_likelihood <- 1
+
+    # Simulator params
+# replicate rows for nSims
+    nSims <- 1
+    simRunDf = runDf
+    simRunDf$betaMean <-  .3 #runif(nSims, 0, 1) #c(.2,.4)
+    simRunDf$gamma <- .29 #runif(nSims, 0, 1) #c(1/2,1/10)
+    simRunDf$deathRate <-  .01 #runif(nSims, 0, 1) #c(.1,.2)
+    simRunDf$tweetRate <-  .25 #runif(nSims, 0, 2) #c(.2,.8)
+    simRunDf$daysToDeath <-  20 #runif(nSims, 1, 20) #c(1,10)
+    simRunDf$sdBeta <-  -1 #rep(.00001, nSims) #c(.0001,.2)
+    simRunDf$nPatientZero <-  10 #c(10,100)
+    simRunDf$nDailyContactsInf <- 10
+    betaInfRatePerDayList <- list(rep(simRunDf$betaMean, nDays))
+    simRunDf$betaInfRatePerDay <- rep(betaInfRatePerDayList, nSims)
+
+# Run config params, for each runDf set, alter config and add
+    simRunDf$description <- 'sim, block ode with twitter'
+    simRunDf$odeSolver <- 'block'
+    simRunDf$runTwitter <- 1
+    simRunDf$modelToRun <- 'twitter_sird'
+
+    runDf = simRunDf
+    i = 1
+    reduction = 10000
+    simDf = SirtdVaryBeta(runName = runDf[i,]$runId,
+                          seed = runDf[i,]$seed,
+                          nPop = round(runDf[i,]$nPop/reduction), 
+                          nDays = runDf[i,]$nDays, 
+                          print = FALSE,
+                          betaDailyInfectionRates = unlist(runDf[i,]$betaInfRatePerDay),
+                          gammaResolvedPerDayRate = runDf[i,]$gamma,
+                          tweetRateInfected = runDf[i,]$tweetRate,
+                          meanDaysToDeathFromT = runDf[i,]$daysToDeath,
+                          nPatientZero = runDf[i,]$nPatientZero,
+                          nDailyContacts = runDf[i,]$nDailyContactsInf,
+                          deathRate = runDf[i,]$deathRate)
+      expect_equal(sum(simDf$tweets), 928)
+})
+
 test_that("NA test", {
-  set.seed(4614)
+  seed = 4614
   nPop <- 10000
   nWeeks <- 7
              nDays <- 70
@@ -18,7 +75,9 @@ test_that("NA test", {
   betaForWeek = abs(rnorm(nWeeks, betaInfectionRateMeanSim, sdOfBetas))
   betaDailyInfectionRatesSim = rep(betaForWeek, times = rep(7,nWeeks))
 
-  simDf = SirtdVaryBeta(runName = 'test', nPop = nPop, nDays = nDays, print = TRUE,
+  simDf = SirtdVaryBeta(runName = 'test',
+                        seed = seed,
+                        nPop = nPop, nDays = nDays, print = FALSE,
                       betaDailyInfectionRates = betaDailyInfectionRatesSim,
                       gammaResolvedPerDayRate = gammaResolvedPerDayRateSim,
                       tweetRateInfected = tweetRateInfected,
@@ -32,7 +91,7 @@ test_that("NA test", {
 
 
 test_that("SIRTD test1",{
-  set.seed(43614)
+  seed = 43614
   nPop = 10000
   nWeeks = 10
   nDays = nWeeks * 7
@@ -47,7 +106,9 @@ test_that("SIRTD test1",{
   nPatientZero = 10
   nDailyContacts = 10
 
-  simDf = SirtdVaryBeta(runName = 'test', nPop = nPop, nDays = nDays, print = FALSE,
+  simDf = SirtdVaryBeta(runName = 'test',
+                        seed = seed,
+                        nPop = nPop, nDays = nDays, print = FALSE,
                       betaDailyInfectionRates = betaDailyInfectionRatesSim,
                       gammaResolvedPerDayRate = gammaResolvedPerDayRateSim,
                       tweetRateInfected = tweetRateInfected,
@@ -57,8 +118,8 @@ test_that("SIRTD test1",{
                       deathRate = deathRateSim)
   
   expect_equal(nrow(simDf), 70)
-  expect_equal(simDf[50,]$tweets, 854)
-  expect_equal(simDf[50,]$d, 364)
+  expect_equal(simDf[50,]$tweets, 857)
+  expect_equal(simDf[50,]$d, 299)
 })
 
 
