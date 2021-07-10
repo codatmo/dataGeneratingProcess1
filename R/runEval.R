@@ -107,6 +107,7 @@ model_tweets_df$description <- paste0(model_tweets_df$description,
 run_df <- rbind(model_no_tweets_df, model_tweets_df)
 run_df$ode_solver <- 'block'
 run_df$compute_likelihood <- 1
+run_df$reports <- list(c('graph_sim','plot'))
 # section 4
 
 
@@ -172,110 +173,54 @@ for (j in 1:nrow(run_df)) {
                           chains = 4,
                           seed = 4857)
       }
+    if (!is.na(run_df[j,]$model_to_run)) {
+      d_tweets_in_interval = countPredictionsInQuantile(fit = fit, 
+                                                        run_df = run_df, 
+                                                        j = j, print = TRUE)  
+      run_df[j,]$d_in_interval = d_tweets_in_interval[1]
+      run_df[j,]$tweets_in_interval = d_tweets_in_interval[2]
+    }
     else {
       print(sprintf("no model selected, got:'%s'",run_df[j,]$model_to_run));
     }
-    d_tweets_in_interval = countPredictionsInQuantile(fit = fit, run_df = run_df, j = j, print = TRUE)  
-    run_df[j,]$d_in_interval = d_tweets_in_interval[1]
-    run_df[j,]$tweets_in_interval = d_tweets_in_interval[2]
+  # section 5
+  # section 6  
+  plot <- ggplot(data = NULL, aes(x = day, y = count))
+  if ('graph_sim' %in% run_df[j,]$reports) {
+    plot <- plot +  graph_sim_data(data_df = run_df[j,])
+  }
+  if ('graph_ODE' %in% run_df[j,]$reports) {
+    plot <- plot + graph_ODE(data_df = run_df[j,], fit = fit)
+  }
+  if ('graph_tweets' %in% run_df[j,]$reports) {
+    plot <- plot_predictions(plot = plot, prediction_label = 'pred_tweets', 
+                             fit = fit, 
+                             show_ribbon = TRUE)
+  }
+  if ('graph_d' %in% run_df[j,]$reports) {
+    plot <- plot_predictions(plot = plot, prediction_label = 'pred_deaths', 
+                             fit = fit, 
+                             show_ribbon = TRUE)
+  }
+  if ('plot' %in% run_df[j,]$reports) {
+    print(plot)
+  }
+  if ('param_recovery' %in% run_df[j,]$reports) {
+    cat(param_recovery(data_df = run_df[j,], fit = fit))
+  }
+  # section 6
 }
-# section 5
-
-# section 6
-  summary_cols = c('sim_run_id', 'model_to_run', 'beta_mean', 'gamma', 'death_prob',
+# section 7
+summary_cols = c('sim_run_id', 'model_to_run', 'beta_mean', 'gamma', 'death_prob',
                    'tweet_rate', 'days2death', 'ode_solver', 'description',
                    'd_in_interval', 'tweets_in_interval')
-  print(run_df[,summary_cols])
-# section 6
-
-graphSimData <- function() {
-  if (run_df[j,]$model_to_run == 'none') {
-    sim_df = data.frame(day = 1:run_df[j,]$n_days, 
-                        tweets = unlist(run_df[j,]$tweets), 
-                        s = unlist(run_df[j,]$s),
-                        i = unlist(run_df[j,]$i),
-                        r = unlist(run_df[j,]$r),
-                        t = unlist(run_df[j,]$t),
-                        d = unlist(run_df[j,]$d))
-    sim_long_df = gather(data = sim_df, key = "compartment_sim", value = "count",
-                         all_of(c('tweets', compartmentNames)))
-    
-    plot = ggplot(data = NULL, aes(x = day, y = count)) +
-      geom_point(data = sim_long_df, aes(y = count, 
-                                         color = compartment_sim)) +
-      labs(y = "sim data in dots",
-           caption = paste0("dots for simulated truth") +
-             theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0))))
-    
-    print(plot)
-}
+print(run_df[,summary_cols])
+# section 7
 
   
+
+
   if (FALSE) {
-    
-    
-    
-    
-    plot <- ggplot(data = NULL, aes(x = day, y = mean)) +
-      # geom_ribbon(data = predCasesDf, aes(ymin = .data[[minQuantileLabel]],
-      #                                     ymax = .data[[maxQuantileLabel]],
-      #                                     fill = predCasesRibbon),
-      #             alpha = 0.3, fill = "red") +
-      geom_line(data = predCasesDf,
-                aes(color = 'pred cases death')) +
-      geom_point(data = dataDf, 
-                 aes(y = perc_d, color = 'sim cases'), size = .5, color = "black")
-    
-    #   
-    #           #cases twitter informed
-    # geom_ribbon(data = predTweetsDf,  aes(ymin = .data[[minQuantileLabel]],
-    #                                       ymax = .data[[maxQuantileLabel]],
-    #                                       fill = predCasesRibbon),
-    #             alpha = 0.3, fill = "blue") +
-    # 
-    # 
-    # #twitter
-    # geom_ribbon(data = predTweetsDf,  aes(ymin = .data[[minQuantileLabel]],
-    #                                       ymax = .data[[maxQuantileLabel]],
-    #                                       fill = 'pred tweets'),
-    #             alpha = 0.3, fill = "yellow") +
-    # geom_line(data = predTweetsDf, aes(color = 'pred tweets')) +
-    # geom_point(data = dataDf, aes(y = tweets, color = 'sim tweets'), size = .5, color = 'black') +
-    # 
-    # #  scale_fill_manual(labels = c('infected', 'tweets'))
-    # labs(y = "mean with 80% shaded interval and sim data in dots",
-    #      caption = summary) +
-    # theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
-    print(plot)
-  }
-  if (loadSim && FALSE) {
-    resultsOdeDf = fit$summary(variables = c('ode_states'))
-    
-    tweetSourceName = compartmentNames[2]
-    odeDf = data.frame(matrix(resultsOdeDf$median, nrow = nrow(simDf),
-                              ncol = length(compartmentNames)))
-    colnames(odeDf) = compartmentNames
-    odeDf$day = 1:nrow(simDf)
-    
-    odeLongDf = gather(data = odeDf, key = "compartmentODE", value = "mean",
-                       all_of(compartmentNames))
-    
-    simLongDf = gather(data = simDf, key = "compartmentSim", value = "count",
-                       all_of(c('tweets', compartmentNames)))
-    
-    plot = ggplot(data = NULL, aes(x = day, y = nPop * mean)) +
-      geom_line(data = odeLongDf, aes(color = compartmentODE)) +
-      geom_line(data = simLongDf, linetype = 'dotted', aes(y = count * reduction, 
-                                                           color = compartmentSim)) +
-      labs(y = "median with sim data in dots",
-           caption = paste0("predicted shaded, lines with dots for simulated truth, compartment is = ",
-                            compartmentName), " tweets from ", tweetSourceName) +
-      theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
-    
-    print(plot)
-  }
-  
-  if (loadSim && FALSE) {
     recovPars = 
       fit$summary(variables = c('gamma', 'beta', 'deathRate', 'lambda_twitter'), 
                   mean, sd)
@@ -299,5 +244,5 @@ graphSimData <- function() {
                 recovPars[recovPars$variable == 'lambda_twitter',]$sd))
   }
 #  saveRDS(runDf,here::here("R",sprintf("%d_of_%devalBrazil622.rds",i,nrow(runDf))))
-}
+
 
