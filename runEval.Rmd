@@ -84,10 +84,12 @@ The `randomChance()` function stands in place of many functions like the Bernoul
 Actual code below
 -->
 
-
+The actual code is shown below, the Rmarkdown commands are included to be clear about where code is and how the document is being generated. 
 ```{r echo=TRUE }
 cat(paste(readLines(here::here("R","SIRTDsim.R")), "\n"))
 ```
+
+The focus on this presentation is the surrounding framework so we offer the simulation code without comment, discussion of the DGP/simulation is at [to be determined](). 
 
 # Running simulation and fitting a model
 
@@ -150,16 +152,18 @@ It is possible to run data in this setup from non-simulated sources. An example 
 
 ## Configuring modeling
 
-Now we add the ways to configure modeling parameters. Since the number of simulations run will be copied per model setup there will be model setups X simulation setups rows in in the resulting data frame. 
+Now we add the ways to configure modeling parameters. Since the number of simulations run will be copied per model setup there will be model setups times simulation setups rows in in the resulting data frame. 
 
 ```{r}
 cat(pull_section('# section 4', here::here('R','runEval.R')))
 ```
 Note that the `description` value is appended so it is possible to track variations. In this example the use of tweets to inform the model is varied. The `run_df` is created from the two model setups and then the the `ode_solver` and `compute_liklihood` parameters are set that will span all the model/sim configurations.
+Finaly there is the `reports` column that controls what graphs and summaries are printed during the runs. All available options are shown. 
+
 
 ## Running models
 
-Each row of `run_df` is a complete specification of data and model configuration. The code simply iterates over each row, fits it with the appropriate model/model configuration and adds the results of computing how many simulated days data for tweets and deaths are i the .2 to .8 center interval of the samples. See `R/util.R` for the implementation of `countPredictionsInQuantile`.
+Each row of `run_df` is a complete specification of data and model configuration. The code simply iterates over each row, fits it with the appropriate model/model configuration if there is one specified and adds the results of computing how many simulated days data for tweets and deaths are in the .2 to .8 central interval of the samples for the model run. See `R/util.R` for the implementation of `countPredictionsInQuantile`.
 
 ```{r}
 cat(pull_section('# section 5', here::here('R','runEval.R')))
@@ -167,17 +171,49 @@ cat(pull_section('# section 5', here::here('R','runEval.R')))
 
 ## Presenting results
 
-At this point results will likely get more idiosyncratic to experiment needs. Below we present the filled data frame with the relevant summary columns.
+At this point results will likely get more idiosyncratic to experiment needs. The below if statements check the listed values for `reports` and apply the corresponding reporting. Note that each run is reported with no attempt to collect them into a collection--we intend to add that functionality eventually. In order there are graphing options to:
+
+* Graph simulation compartments with dots. 
+* Graph ODE compartments if the Stan model mirrors the states of the simulation, e.g., is roughly isomorphic.
+* Graph predicted tweets and predicted 'd' or deaths from the Stan model. If the likelihood is run then this is a posterior predictive check, if the likelihood is not run then it is a prior predictive check. There is a 20%/80% central interval ribbon plot as well. 
+* Control over whether the plots are printed. All plots for a single run are overlaid.
+
+All subroutines are in the `R/Util.R` file. 
 
 ```{r}
   cat(pull_section('# section 6', here::here('R','runEval.R')))
 ```
+Example output is:
+
+```{r echo=FALSE}
+print(plot)
+```
+
+A parameter recovery report finalizs the reporting options per run:
+
+```{r}
+ cat(pull_section('# section 7', here::here('R','runEval.R')))
+```
+which summarizes as follows;
+
+```{r echo=FALSE}
+  cat(param_recovery(data_df = run_df[j,], fit = fit))
+```
+
+A summary across all the runs is done next by reporting relevant columns of the run_df:
+
+```{r}
+ cat(pull_section('# section 8', here::here('R','runEval.R')))
+```
+
+Example output is:
+
 ```{r echo=FALSE}
 print(run_df[,summary_cols])
 ```
 
+
+
 There are many more result views available that we will eventually integrate into this document. They include:
 
-* Comparison of a ODE predictions to simulation compartments for appropriate models. 
-* Using ribbon plots to graph varying sampling intervals
 * Time series analyis, e.g., what happens with simulations that only provide the first interval of data to the models? 

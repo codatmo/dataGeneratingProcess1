@@ -167,7 +167,7 @@ generated quantities {
                                    sigma_twitter_noise));
       }
       else {
-        pred_tweets[i] = -100000;
+        pred_tweets[i] = 0;
       }
       pred_deaths[i] = sdDeaths * (normal_rng(daily_counts_ODE[i, iCompartment], 
                                  sigma_compartment_noise));

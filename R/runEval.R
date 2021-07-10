@@ -62,9 +62,9 @@ if (n_runs > 1) {
 SIRTD_sim_df$beta_mean <- runif(n_runs, 0.2, 0.3)
 SIRTD_sim_df$beta_daily_rate <- list(rep(SIRTD_sim_df$beta_mean, 
                                     SIRTD_sim_df$n_days))
-SIRTD_sim_df$gamma <- runif(n_runs, 0.2, 0.3)
+SIRTD_sim_df$gamma <- runif(n_runs, 0.1, 0.2)
 SIRTD_sim_df$death_prob <- runif(n_runs, 0.01, 0.03)
-SIRTD_sim_df$tweet_rate <- runif(n_runs, 0.1, 1.5)
+SIRTD_sim_df$tweet_rate <- runif(n_runs, 0.5, 1.5)
 SIRTD_sim_df$days2death <- 20
 SIRTD_sim_df$n_patient_zero <- 20
 SIRTD_sim_df$description <- sprintf("SIRTD sim: %d runs", n_runs)
@@ -107,7 +107,8 @@ model_tweets_df$description <- paste0(model_tweets_df$description,
 run_df <- rbind(model_no_tweets_df, model_tweets_df)
 run_df$ode_solver <- 'block'
 run_df$compute_likelihood <- 1
-run_df$reports <- list(c('graph_sim','plot'))
+run_df$reports <- list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d',
+                         'plot','param_recovery'))
 # section 4
 
 
@@ -183,66 +184,41 @@ for (j in 1:nrow(run_df)) {
     else {
       print(sprintf("no model selected, got:'%s'",run_df[j,]$model_to_run));
     }
-  # section 5
-  # section 6  
+# section 5
+# section 6
   plot <- ggplot(data = NULL, aes(x = day, y = count))
-  if ('graph_sim' %in% run_df[j,]$reports) {
+  if ('graph_sim' %in% unlist(run_df[j,]$reports)) {
     plot <- plot +  graph_sim_data(data_df = run_df[j,])
   }
-  if ('graph_ODE' %in% run_df[j,]$reports) {
+  if ('graph_ODE' %in% unlist(run_df[j,]$reports)) {
     plot <- plot + graph_ODE(data_df = run_df[j,], fit = fit)
   }
-  if ('graph_tweets' %in% run_df[j,]$reports) {
+  if ('graph_tweets' %in% unlist(run_df[j,]$reports)) {
     plot <- plot_predictions(plot = plot, prediction_label = 'pred_tweets', 
                              fit = fit, 
                              show_ribbon = TRUE)
   }
-  if ('graph_d' %in% run_df[j,]$reports) {
+  if ('graph_d' %in% unlist(run_df[j,]$reports)) {
     plot <- plot_predictions(plot = plot, prediction_label = 'pred_deaths', 
                              fit = fit, 
                              show_ribbon = TRUE)
   }
-  if ('plot' %in% run_df[j,]$reports) {
+  if ('plot' %in% unlist(run_df[j,]$reports)) {
     print(plot)
   }
+# section 6
+# section 7
   if ('param_recovery' %in% run_df[j,]$reports) {
     cat(param_recovery(data_df = run_df[j,], fit = fit))
   }
-  # section 6
-}
 # section 7
+}
+# section 8
 summary_cols = c('sim_run_id', 'model_to_run', 'beta_mean', 'gamma', 'death_prob',
                    'tweet_rate', 'days2death', 'ode_solver', 'description',
                    'd_in_interval', 'tweets_in_interval')
 print(run_df[,summary_cols])
-# section 7
+# section 8
 
-  
-
-
-  if (FALSE) {
-    recovPars = 
-      fit$summary(variables = c('gamma', 'beta', 'deathRate', 'lambda_twitter'), 
-                  mean, sd)
-    cat(sprintf("\nBeta sim = %.4f vs recovered %.4f, sd=%.4f",
-                runDf[i,]$betaMean, 
-                recovPars[recovPars$variable == 'beta',]$mean,
-                recovPars[recovPars$variable == 'beta',]$sd))
-    
-    cat(sprintf("\nGamma sim = %.4f vs recovered %.4f, sd=%.4f",
-                runDf[i,]$gamma, 
-                recovPars[recovPars$variable == 'gamma',]$mean,
-                recovPars[recovPars$variable == 'gamma',]$sd))
-    
-    cat(sprintf("\nDeaths sim = %.4f vs recovered %.4f, sd=%.4f",
-                runDf[i,]$deathRate, 
-                recovPars[recovPars$variable == 'deaths',]$mean,
-                recovPars[recovPars$variable == 'deaths',]$sd))
-    cat(sprintf("\nLambda Twitter sim = %.4f vs recovered %.4f, sd=%.4f",
-                runDf[i,]$tweetRate, 
-                recovPars[recovPars$variable == 'lambda_twitter',]$mean,
-                recovPars[recovPars$variable == 'lambda_twitter',]$sd))
-  }
 #  saveRDS(runDf,here::here("R",sprintf("%d_of_%devalBrazil622.rds",i,nrow(runDf))))
-
 

@@ -131,8 +131,8 @@ param_recovery <- function(data_df, fit) {
                 mean, sd)
     return(paste(sprintf("\nBeta sim = %.4f vs recovered %.4f, sd=%.4f",
             data_df$beta_mean, 
-            recovPars[recovPars$variable == 'beta',]$mean,
-            recovPars[recovPars$variable == 'beta',]$sd),
+            recov_pars[recov_pars$variable == 'beta',]$mean,
+            recov_pars[recov_pars$variable == 'beta',]$sd),
     sprintf("\nGamma sim = %.4f vs recovered %.4f, sd=%.4f",
             data_df$gamma, 
             recov_pars[recov_pars$variable == 'gamma',]$mean,
