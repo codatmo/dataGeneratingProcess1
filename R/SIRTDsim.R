@@ -30,8 +30,8 @@ sirtd_vary_beta <- function(seed,
           "Day=%d, susceptible=%d, infected=%d, recovered=%d, terminal=%d,
            dead=%d, tweets=%d, R0=%.2f\n",
           df[day,]$day, df[day,]$s, df[day,]$i, df[day,]$r, df[day,]$t,
-          df[day,]$d, df[day,]$tweets, 
-          beta_daily_inf_rate[day]/gamma_res_per_day_rate))
+          df[day,]$d, df[day,]$tweets,
+          beta_daily_inf_rates[day]/gamma_res_per_day_rate))
     }
     tweets = rep(0, n_pop) #start fresh every day, certainly wrong.
     for (per in 1:n_pop) {
@@ -48,7 +48,7 @@ sirtd_vary_beta <- function(seed,
         }
       }
       if (day_state[per] == 't') {
-        
+
         if (rbinom(n = 1, size =1, prob = 1/mean_days_to_death_from_t) == 1) {
           next_day_state[per] = 'd'
         }
