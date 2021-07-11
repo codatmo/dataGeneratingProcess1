@@ -64,15 +64,11 @@ model {
   //priors
   beta ~ normal(2, 1);
   omega ~ normal(0.4, 0.5);
-  dI ~ normal(7, 2);
-  dT ~ normal(10, 2);
+  dI ~ normal(10, 2);
+  dT ~ normal(16, 2);
   phi_inv ~ exponential(5);
   phi_twitter_inv ~ exponential(5);
-  proportion_twitter ~ beta(1, 2); // Beta is a better prior for proportions
-
-  // Compartment Noises
-  I_noise ~ normal(0, 20);       // 20 is too high...
-  twitter_noise ~ normal(0, 20); // 20 is too high...
+  proportion_twitter ~ exponential(1.5);
 
   if (compute_likelihood == 1){
     for (i in 1:n_days) {
