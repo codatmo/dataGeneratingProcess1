@@ -70,11 +70,11 @@ transformed parameters{
         y0[5]
     ]';
     matrix[4, 4] transition_matrix = matrix_exp([
-    //[I                  R,                ,T     ,D]
-      [-1/dI             ,0                 ,0      ,0],//I
-      [+1/dI*(1 - omega) ,-1/dI*(1 - omega) ,0      ,0],//R
-      [+1/dI*omega       ,0                 ,-1/dT  ,0],//T
-      [0                 ,0                 ,+1/dT  ,0] //D
+    //[I                  R, ,T     ,D]
+      [-1/dI             ,0  ,0      ,0],//I
+      [+1/dI*(1 - omega) ,0  ,0      ,0],//R
+      [+1/dI*omega       ,0  ,-1/dT  ,0],//T
+      [0                 ,0  ,+1/dT  ,0] //D
     ]);
     real S = population;
     real last_D;
