@@ -8,6 +8,13 @@ data {
   int<lower=0, upper=1> compute_likelihood;
   int<lower=0, upper=1> use_twitter;
   real<lower=0> beta_regularization;
+  real prior_omega_mean;
+  real prior_omega_std;
+  real prior_dI_mean;
+  real prior_dI_std;
+  real prior_dT_mean;
+  real prior_dT_std;
+  real prior_twitter_lambda;
 }
 transformed data {
   real population = sum(y0);
@@ -42,7 +49,7 @@ parameters {
 
   real<lower=0.001> phi_inv;
   real<lower=0.001> phi_twitter_inv;
-  real<lower=0, upper=1> proportion_twitter;
+  real<lower=0> twitter_rate;
 }
 transformed parameters{
   real phi = 1.0 / phi_inv;
@@ -108,23 +115,22 @@ model {
 
   //One possible regularization
   if(beta_regularization){
-    unit_dS[2:n_days] ~ lognormal(log(unit_dS[:n_days-1]), beta_regularization);
+    unit_dS[2:n_days] ~ lognormal(log(unit_dS[:n_days-1]), 1 /beta_regularization);
   }
   //This imposes a very wide prior on the proportion of still susceptible people!
-  unit_dS[n_days+1] ~ uniform(0,1);
+  unit_dS[n_days+1] ~ uniform(0, 1);
 
-  beta ~ normal(2, 1);
-  omega ~ normal(0.4, 0.5);
-  dI ~ normal(10, 2);
-  dT ~ normal(16, 2);
+  omega ~ normal(prior_omega_mean, prior_omega_std);
+  dI ~ normal(prior_dI_mean, prior_dI_std);
+  dT ~ normal(prior_dT_mean, prior_dT_std);
   phi_inv ~ exponential(5);
   phi_twitter_inv ~ exponential(5);
-  proportion_twitter ~ exponential(1.5);
+  twitter_rate ~ exponential(prior_twitter_lambda);
 
   if (compute_likelihood == 1){
     for (i in 1:n_days) {
       if (use_twitter == 1) {
-        symptomaticTweets[i] ~ neg_binomial_2(proportion_twitter * state_I[i],
+        symptomaticTweets[i] ~ neg_binomial_2(twitter_rate * state_I[i],
                                               phi_twitter);
       }
     }
@@ -136,7 +142,7 @@ generated quantities {
   // Tweets
   vector[n_days] state_tweets;
   for (i in 1:n_days) {
-    state_tweets[i] = proportion_twitter * state_I[i];
+    state_tweets[i] = twitter_rate * state_I[i];
   }
 
   int pred_deaths[n_days];
@@ -146,7 +152,7 @@ generated quantities {
           pred_deaths[i] = neg_binomial_2_rng(state_D[i], phi);
       }
       if (use_twitter == 1) {
-          pred_tweets[i] = neg_binomial_2_rng(proportion_twitter *
+          pred_tweets[i] = neg_binomial_2_rng(twitter_rate *
                                    state_I[i], phi_twitter);
       }
   }

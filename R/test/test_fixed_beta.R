@@ -30,7 +30,16 @@ stan_data <- list(
     death_count = df_sim_fixed_beta$d,
     symptomaticTweets = df_sim_fixed_beta$tweets,
     compute_likelihood = 1,
-    use_twitter = 1
+    use_twitter = 1,
+    prior_beta_mean = 2,
+    prior_beta_std = 1,
+    prior_omega_mean = 0.4,
+    prior_omega_std = 0.5,
+    prior_dI_mean = 10,
+    prior_dI_std = 2,
+    prior_dT_mean = 16,
+    prior_dT_std = 2,
+    prior_twitter_lambda = 1.5
 )
 
 fit_sim <- model$sample(
@@ -44,13 +53,13 @@ fit_sim <- model$sample(
 
 # dI is 1/gamma_res_per_day_rate
 # omega is death_prob
-fit_sim$summary(c("beta", "omega", "dI", "dT", "proportion_twitter"))
+fit_sim$summary(c("beta", "omega", "dI", "dT", "twitter_rate"))
 
-# # A tibble: 5 x 10
-#   variable               mean   median       sd      mad       q5      q95  rhat ess_bulk ess_tail
-#   <chr>                 <dbl>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl> <dbl>    <dbl>    <dbl>
-# 1 beta                0.193    0.193   0.00208  0.00212   0.189    0.196    1.00    1687.    2336.
-# 2 omega               0.00647  0.00646 0.000603 0.000593  0.00550  0.00749  1.00    2190.    2397.
-# 3 dI                 11.6     11.6     0.397    0.404    11.0     12.2      1.00    1493.    1818.
-# 4 dT                 16.8     16.8     1.90     1.87     13.8     20.0      1.00    2043.    2253.
-# 5 proportion_twitter  0.418    0.417   0.0199   0.0201    0.386    0.451    1.00    1709.    2179.
+# A tibble: 5 x 10
+#   variable         mean   median       sd      mad       q5      q95  rhat ess_bulk ess_tail
+#   <chr>           <dbl>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl> <dbl>    <dbl>    <dbl>
+# 1 beta          0.193    0.193   0.00206  0.00199   0.189    0.196    1.00    1946.    2310.
+# 2 omega         0.00648  0.00646 0.000608 0.000613  0.00550  0.00751  1.00    2195.    2200.
+# 3 dI           11.5     11.5     0.383    0.375    10.9     12.2      1.00    1648.    1880.
+# 4 dT           16.9     16.9     1.90     1.89     13.8     20.0      1.00    2331.    2794.
+# 5 twitter_rate  0.420    0.420   0.0194   0.0196    0.388    0.452    1.00    1769.    2151.
