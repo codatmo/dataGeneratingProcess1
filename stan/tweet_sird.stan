@@ -98,8 +98,8 @@ transformed data {
   for (i in 2:n_days) {
       ts[i] = ts[i - 1] + 1;
   }
-  print("tweets_s_c", tweets_s_c);
-  print("deaths_s_c", deaths_s_c);
+#  print("tweets_s_c", tweets_s_c);
+#  print("deaths_s_c", deaths_s_c);
 }
 parameters {
   real<lower = 0, upper = 1> gamma;

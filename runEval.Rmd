@@ -1,5 +1,5 @@
 ---
-title: "SIRTD Data Generating Processes"
+title: "Simulate/Run/Evaluate Code for SIRTD models"
 author:
   - "Breck Baldwin"
   - "Jose Storopoli"
@@ -15,160 +15,166 @@ set.seed(4857)
 
 # Introduction
 
-This page contains data generating programs for a common class of epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered --SIR models. This page/code adds compartments for (T) terminal and (D) dead counts useful for the grim task of distinguishing the dead from recovered. There is additionally data generated for tweets but that exists in parallel with the core SIRTD model.
+This page describes the simulation, modeling and evaluation code in `R/runEval.R` The goal is to provide sufficient information to run and modify the code. The focus for the current data generating process is SIRTD epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered --SIR models. The current simulations add compartments for (T) terminal and (D) dead counts useful for the grim task of distinguishing the dead from recovered. There is additionally data generated for tweets from individuals in the infected compartment but that exists separate from the core SIRTD model.
 
 For more explanation about SIR models see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which we found to be a good explanation as well as an excellent introduction to Bayesian approaches using Stan. This is the model used to fit this data, there is a model reproduction check list at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/).
 
 # Navigation
 
-This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1/](https://github.com/codatmo/dataGeneratingProcess/) as 'runEval.Rmd' and rendered as 'runEval.html'.
+This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1/](https://github.com/codatmo/dataGeneratingProcess/) as `runEval.Rmd` and rendered as `runEval.html`.
 
 # Data Generating Process
 
-The data generating process simulates a fixed population at the individual level on a daily basis. Larger or smaller uniform units could be used. 
+The data generating process simulates a fixed population at the individual level on a daily basis. There are a series of simulating DGPs with varied properties. This document covers a DGP that closely mirrors the compartment model structure with real valued compartments with population transfers between states computed via real valued multiplication on each day of the simulation. There is no stochastic element at all in this simulation since it serves as a baseline for more complex models which will have stochastic (random) elements as well as operating on different scales, e.g., agent-based models.  
 
-<!--At a pseudo code level the algorithm is:
+The actual code is shown below, the Rmarkdown commands are included to be clear about where code is and how the document is being generated. Note that there is a `pull_section` function that prints sections of code based on being between comments that will be used throughout. This allows software to exist outside the notebook format without introducing copy/paste errors that often come up or other mismatches between running code and it's description. 
 
-```
-nPop = 1000 # population size
-nPatientZero = 10 # how many start infected
-nDailyContacts = 10 # number of daily contacts per day for infected
-betaDailyInfectionRates[nDays] = list of infection rate for each day--can vary
-gammaResolvedDailyRate = rate moving from 'i' to 'r' or 't'
-dailyTweetRateInfected = rate of tweets per person that is 'i'
-meanDaysToDeath = mean of how many days does it take from 't' to 'd'
-Create dayState[nPop] list of all people with state = 's' for susceptible
-
-Patient zeros: set nPatientZero number of dayState list to 'i' for infected
-
-
-tweets[nDay] = count of tweets per day
-
-
-for (day in numberOfDays) {
-  Copy dayState to nextDayState
-  for (person in 1 to nPop) { # infections
-    if (dayState[person] equals 'i') { # infecting others
-      for (otherPerson in sample(numberDailyContacts, nPop))
-        chanceInfection = betaDailyInfectionRates[day]/numberDailyContacts
-          if (randomChance(person, chanceInfection) == infected and
-              dayState[otherPerson] equals 's') {
-             nextDayState[otherPerson] = 'i'
-          }
-    }
-    if (dayState[person] equals 'i') { # recovery or death
-      if (randomChance(person, gammaResolvedDailyRate) == resolved) {
-         if (randomChoice(person, deathRate) == died) {
-            nextDayState[person] = 't' #terminally ill
-         }
-         else {
-            nextDayState[person] = 'r' # recovered, will not die
-         }
-      }
-    }
-    if (dayState[person] equals 'i') { # do they tweet while infected
-      if (randomChance(person, tweetDailyRateInfected) == tweets) {
-         tweetCountForDay[day] = tweetCountForDay[day] + 1
-      }
-    }
-    if (dayState[person] equals 't') { # does a 't' -> 'd'
-      if (randomChance(person, meanDaysToDeath) == death) {
-          nextDayState[person] = 'd'
-      }
-    }
-   dayState = nextDayState # overwrite the current day with the day we just created
-}
-```
-The `randomChance()` function stands in place of many functions like the Bernoulli distribution. But there are many candidates, the source below details the actual choices.
-
-Actual code below
--->
-
-The actual code is shown below, the Rmarkdown commands are included to be clear about where code is and how the document is being generated. 
 ```{r echo=TRUE }
-cat(paste(readLines(here::here("R","SIRTDsim.R")), "\n"))
-```
-
-The focus on this presentation is the surrounding framework so we offer the simulation code without comment, discussion of the DGP/simulation is at [to be determined](). 
-
-# Running simulation and fitting a model
-
-Below we go over how to setup and run the simulation code that generates data and runs experiments. The code is in `R\runEval.R` and the code below is pulled dynamically from the code so it will always be up to date every time this document is generated. 
-
-```{r echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, results='hide'}
-source(here::here('R','runEval.R'))
-```
-
-
-```{r echo=TRUE}
-
-pull_section <- function(section, file) {
-  print = FALSE
+#' Returns lines of file between the identified section '# <section name>' and 
+#' the matching section later in the file or the end of the file.
+#' @param sections Comment that starts/stops collection of lines, e.g., '# section 1'
+#' @param file Path to file to pull from
+pull_section <- function(section, file, num_lines = FALSE) {
+  collect = FALSE
   return_string = ''
+  line_num = 0
   for (line in readLines(file)) {
+    line_num = line_num + 1
     if (line == section) {
-      print = !print
+      collect = !collect
     }
-    if (print) {
-      return_string = paste0(return_string, line, '\n')
+    prefix = ""
+    if (num_lines) {
+        prefix = paste0(line_num,": ")
+    }
+    if (grepl(section,line)) {
+      return_string = paste0(return_string, paste0(prefix,line), '\n')
+    }
+    else if (collect) {
+      return_string = paste0(return_string, paste0(prefix,line), '\n')
     }
   }
   return(return_string)
 }
 
-cat(pull_section('# section 1', here::here('R','runEval.R')))
+cat(pull_section('# sirtd_vary_beta_exact', here::here('R','SIRTDsim.R')))
 
 ```
-Above the `template_df` is initialized with column names and global parmeters, `n_days` and  `n_pop`. The simulation will populate the data columns, actual data may only populate some of the columns, e.g., `template_df$d` and `templte_df$tweets` in the case of the current Brazil data. Printing the data frame: 
-```{r}
-print(template_df)
-```
 
-### Adding simulation parameters
+The focus on this presentation is the surrounding framework so we offer the simulation code without comment, discussion of the DGP/simulation is at [to be determined](). There exists or will exist simulations that do the following:
 
-The parameterization for the simulation is next with deep copies being made of the `template_df` for the number of simulation configurations being created with `n_runs`.
+* SIRTD model, real valued, non-stochastic: This model
+* SIRTD model, real valued, stochastic
+* SIRTD model, real valued, stochastic, varied beta
+* SIRTD model, integer valued, agent based, stochastic
+* SIRTD model, integer valued, agent based, varied beta
 
-```{r}
-cat(pull_section('# section 2', here::here('R','runEval.R')))
-```
-Some parameters have one value across runs, others are a separate draw. The `sim_run_id` will be the same for subsequent copies of that particular draw, this becomes important when multiple modeling options are tried on the same simulated data. 
+We may also run models that are time limited, feature richer social interaction models etc...
 
+# Running simulation and fitting a model
 
-## Running the simulation
-
-The simulation is run next with parameters defined above:
-```{r}
-cat(pull_section('# section 3', here::here('R','runEval.R')))
-```
-The simulation is run, setting `print` to `TRUE` gives day by day accounting of the simulation. We now have a complete simulation run per row of the `SIRTD_sim_df`. Next we add modeling configurations. 
-
-```{r} 
-print(SIRTD_sim_df)
-```
-
-## Running non-simulated data
-
-It is possible to run data in this setup from non-simulated sources. An example will be eventually supplied. 
-
-## Configuring modeling
-
-Now we add the ways to configure modeling parameters. Since the number of simulations run will be copied per model setup there will be model setups times simulation setups rows in in the resulting data frame. 
+Below we go over how to setup and run the simulation code that generates data and runs experiments. The central code is in `R/runEval.R` with use of functions in `R/util.R` for printing/graphing functions, `R/data_configs.R` for code that creates data via simulation or provides actual data, `R/modeling_configs.R` for code that configures parameters for modeling software and `R/SIRTDsim.R` that contains simulation software and is called from functions in `R/data_configs.R`. The libraries and dependencies are:
 
 ```{r}
-cat(pull_section('# section 4', here::here('R','runEval.R')))
+cat(pull_section('# dependencies', here::here('R','runEval.R')))
 ```
-Note that the `description` value is appended so it is possible to track variations. In this example the use of tweets to inform the model is varied. The `run_df` is created from the two model setups and then the the `ode_solver` and `compute_liklihood` parameters are set that will span all the model/sim configurations.
-Finaly there is the `reports` column that controls what graphs and summaries are printed during the runs. All available options are shown. 
 
+## Setting up the `run_df` data frame that controls the experiments
+```{r}
+cat(pull_section('# setup run_df', here::here('R','runEval.R'), num_lines = TRUE))
+```
+The `run_df` is a dataframe where each row will be a complete experiment configuration. The above functions add information relevant to their role. The source is very straightforward should one want to modify for their own purposes. In more detail:
+
+```{r}
+cat(pull_section('setup_run_df', here::here('R','runEval.R'), num_lines = TRUE))
+```
+Running code up to this line shows the following values, note that the dataframe is transposed with rows as columns and columns as rows--unreadable otherwise.
+
+```{r echo=FALSE}
+# dependencies
+library(tidyverse)
+library(cmdstanr)
+library(data.table)
+library(kableExtra)
+
+source(here::here("R","util.R"))
+source(here::here("R","SIRTDsim.R"))
+source(here::here("R","sim_configs.R"))
+source(here::here("R","modeling_configs.R"))
+# dependencies
+# setup run_df
+run_df <- setup_run_df(seed = 93435, n_pop = 1000, n_days = 7)
+kable(t(run_df))
+```
+
+This line constructs a basic template for the `run_df`, there is just one row at this point--remember transposed output. All subsequent additions/elaborations draw from this dataframe. 
+```{r}
+cat(pull_section('sim_brazil_1', here::here('R','runEval.R'), num_lines = TRUE))
+```
+The `sim_brazil_1` is a parameterization that roughly mimics the shape of the COVID-19 outbreak with corresponding simulated values as determined by trying values by hand. Look at the source for more info. Note that the prefix on the function is 'sim', which means that it is part of simulation. There is still one row in the dataframe but with simulation data and the generating paramaterzation. 
+
+The, remember transposed, dataframe is:
+
+```{r echo=FALSE}
+run_df <- sim_brazil_1(run_df)
+kable(t(run_df), digits=3)
+```
+
+We now have simulation data from the SIRTD model for `n_days`. But still only one row--remember transposed above.
+
+```{r}
+cat(pull_section('sim_draw_params', here::here('R','runEval.R'), num_lines = TRUE))
+```
+The next line runs two random based draws from the parmeterization in the single simulation in `run_df`. Two draws are conducted and returned. 
+
+```{r echo=FALSE}
+draws_run_df <- sim_draw_params(2, run_df)
+kable(t(draws_run_df))
+```
+
+Above are transposed output for two draws for slight variations of the Brazil hand parameterization. 
+
+```{r}
+cat(pull_section("rbind", here::here('R','runEval.R'), num_lines = TRUE))
+```
+We bind the Brazil run with the draws resulting in 3 rows. 
+
+```{r echo=FALSE}
+run_df <- rbind(run_df, draws_run_df)
+kable(t(run_df), digits = 3)
+```
+
+## Setting up modeling
+
+At this point we have three sets of data, one hand configured to mirror Brazil data and two that vary simulation parameters from the hand configured model. Now we apply modeling configurations with subroutines from `R/modeling_configs.R`. 
+
+```{r}
+cat(pull_section("model_stan_SIRDs", here::here('R','runEval.R'), num_lines = TRUE))
+```
+
+There are two model configurations which apply to the three rows uniformly so we end up with 6 configurations total. One model applies tweets to the task, and one does not. The final result is:
+
+```{r echo=FALSE}
+run_df <- model_stan_SIRDs(run_df)
+kable(t(run_df), digits = 3)
+```
+
+## Configuring reporting
+The specific reporting can be controlled from the `run_df` as well. 
+
+```{r}
+cat(pull_section("reports <-", here::here('R','runEval.R'), num_lines = TRUE))
+```
+After each `run_df` iteration the listed graphing and print routines are controlled via the above. This list is all available, they are explained below.  
 
 ## Running models
 
 Each row of `run_df` is a complete specification of data and model configuration. The code simply iterates over each row, fits it with the appropriate model/model configuration if there is one specified and adds the results of computing how many simulated days data for tweets and deaths are in the .2 to .8 central interval of the samples for the model run. See `R/util.R` for the implementation of `countPredictionsInQuantile`.
 
 ```{r}
-cat(pull_section('# section 5', here::here('R','runEval.R')))
+cat(pull_section('# run models', here::here('R','runEval.R')))
 ```
-
+Only two models are available at present. 
 ## Presenting results
 
 At this point results will likely get more idiosyncratic to experiment needs. The below if statements check the listed values for `reports` and apply the corresponding reporting. Note that each run is reported with no attempt to collect them into a collection--we intend to add that functionality eventually. In order there are graphing options to:
@@ -183,33 +189,24 @@ All subroutines are in the `R/Util.R` file.
 ```{r}
   cat(pull_section('# section 6', here::here('R','runEval.R')))
 ```
-Example output is:
 
-```{r echo=FALSE}
-print(plot)
-```
 
-A parameter recovery report finalizs the reporting options per run:
+A parameter recovery report finalizes the reporting options per run:
 
 ```{r}
  cat(pull_section('# section 7', here::here('R','runEval.R')))
 ```
-which summarizes as follows;
+which reports on whether the simulation parameters and those from the model.
 
+# All run summary
 ```{r echo=FALSE}
-  cat(param_recovery(data_df = run_df[j,], fit = fit))
+#  cat(param_recovery(data_df = run_df[j,], fit = fit))
 ```
 
 A summary across all the runs is done next by reporting relevant columns of the run_df:
 
 ```{r}
  cat(pull_section('# section 8', here::here('R','runEval.R')))
-```
-
-Example output is:
-
-```{r echo=FALSE}
-print(run_df[,summary_cols])
 ```
 
 
