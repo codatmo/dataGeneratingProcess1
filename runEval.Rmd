@@ -15,22 +15,22 @@ set.seed(4857)
 
 # Introduction
 
-This page describes the simulation, modeling and evaluation code in `R/runEval.R` The goal is to provide sufficient information to run and modify the code. The focus for the current data generating process is SIRTD epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered --SIR models. The current simulations add compartments for (T) terminal and (D) dead counts useful for the grim task of distinguishing the dead from recovered. There is additionally data generated for tweets from individuals in the infected compartment but that exists separate from the core SIRTD model.
+This page describes the simulation, modeling and evaluation code in `R/runEval.R`. The goal is to provide sufficient information to run and modify the code. The focus for the current data generating process (DGP) is SIRTD epidemiological models derived from compartments for the states (S) susceptible, (I) infectious and (R) for recovered -- SIR models. The current simulations add compartments for (T) terminally-ill and (D) deceased counts useful for the grim task of distinguishing the deceased from recovered. There is additionally data generated for tweets that mention symptoms from individuals in the (I) infectious compartment but that exists separate from the core SIRTD model.
 
-For more explanation about SIR models see [https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which we found to be a good explanation as well as an excellent introduction to Bayesian approaches using Stan. This is the model used to fit this data, there is a model reproduction check list at [https://codatmo.github.io/Simple_SIR/](https://codatmo.github.io/Simple_SIR/).
+For more explanation about SIR models see [Stan Case Study -- Boarding School](https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html) which we found to be a good explanation as well as an excellent introduction to Bayesian approaches using Stan. This is the model used to fit this data, there is a model reproduction checklist at [`codatmo/Simple_SIR`](https://codatmo.github.io/Simple_SIR/).
 
 # Navigation
 
-This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [https://github.com/codatmo/dataGeneratingProcess1/](https://github.com/codatmo/dataGeneratingProcess/) as `runEval.Rmd` and rendered as `runEval.html`.
+This Rmarkdown page exists as part of the [CoDatMo](https://codatmo.github.io/) project. The repo containing this page is at [`codatmo/dataGeneratingProcess1`](https://github.com/codatmo/dataGeneratingProcess/) as `runEval.Rmd` and rendered as `runEval.html`.
 
-# Data Generating Process
+# Data Generating Process -- DGP
 
-The data generating process simulates a fixed population at the individual level on a daily basis. There are a series of simulating DGPs with varied properties. This document covers a DGP that closely mirrors the compartment model structure with real valued compartments with population transfers between states computed via real valued multiplication on each day of the simulation. There is no stochastic element at all in this simulation since it serves as a baseline for more complex models which will have stochastic (random) elements as well as operating on different scales, e.g., agent-based models.  
+The DGP simulates a fixed population at the individual level on a daily basis. There are a series of simulating DGPs with varied properties. This document covers a DGP that closely mirrors the compartment model structure with real-valued compartments with population transfers between states computed via real-valued multiplication on each day of the simulation. There is no stochastic (random) element at all in this simulation since it serves as a baseline for more complex models which will have stochastic elements as well as operating on different scales, e.g., agent-based models.
 
-The actual code is shown below, the Rmarkdown commands are included to be clear about where code is and how the document is being generated. Note that there is a `pull_section` function that prints sections of code based on being between comments that will be used throughout. This allows software to exist outside the notebook format without introducing copy/paste errors that often come up or other mismatches between running code and it's description. 
+The actual code is shown below, the Rmarkdown commands are included to be clear about where code is and how the document is being generated. Note that there is a `pull_section` function that prints sections of code based on being between comments that will be used throughout. This allows software to exist outside the notebook format without introducing copy/paste errors that often come up or other mismatches between running code and it's description.
 
 ```{r echo=TRUE }
-#' Returns lines of file between the identified section '# <section name>' and 
+#' Returns lines of file between the identified section '# <section name>' and
 #' the matching section later in the file or the end of the file.
 #' @param sections Comment that starts/stops collection of lines, e.g., '# section 1'
 #' @param file Path to file to pull from
@@ -57,38 +57,39 @@ pull_section <- function(section, file, num_lines = FALSE) {
   return(return_string)
 }
 
-cat(pull_section('# sirtd_vary_beta_exact', here::here('R','SIRTDsim.R')))
+cat(pull_section('# sirtd_vary_beta_exact', here::here('R', 'SIRTDsim.R')))
 
 ```
 
-The focus on this presentation is the surrounding framework so we offer the simulation code without comment, discussion of the DGP/simulation is at [to be determined](). There exists or will exist simulations that do the following:
+The focus on this presentation is the surrounding framework so we offer the simulation code without comment, discussion of the DGP/simulation is at [to be determined](). We are planning to include the following simulations:
 
-* SIRTD model, real valued, non-stochastic: This model
-* SIRTD model, real valued, stochastic
-* SIRTD model, real valued, stochastic, varied beta
-* SIRTD model, integer valued, agent based, stochastic
-* SIRTD model, integer valued, agent based, varied beta
+* SIRTD model, real-valued, non-stochastic (this model)
+* SIRTD model, real-valued, stochastic
+* SIRTD model, real-valued, stochastic, variying-beta
+* SIRTD model, integer-valued, agent-based, stochastic
+* SIRTD model, integer-valued, agent-based, variying-beta
 
-We may also run models that are time limited, feature richer social interaction models etc...
+We may also run models that are time-limited, feature-richer social interaction models etc...
 
 # Running simulation and fitting a model
 
 Below we go over how to setup and run the simulation code that generates data and runs experiments. The central code is in `R/runEval.R` with use of functions in `R/util.R` for printing/graphing functions, `R/data_configs.R` for code that creates data via simulation or provides actual data, `R/modeling_configs.R` for code that configures parameters for modeling software and `R/SIRTDsim.R` that contains simulation software and is called from functions in `R/data_configs.R`. The libraries and dependencies are:
 
 ```{r}
-cat(pull_section('# dependencies', here::here('R','runEval.R')))
+cat(pull_section('# dependencies', here::here('R', 'runEval.R')))
 ```
 
 ## Setting up the `run_df` data frame that controls the experiments
 ```{r}
-cat(pull_section('# setup run_df', here::here('R','runEval.R'), num_lines = TRUE))
+cat(pull_section('# setup run_df', here::here('R', 'runEval.R'), num_lines = TRUE))
 ```
 The `run_df` is a dataframe where each row will be a complete experiment configuration. The above functions add information relevant to their role. The source is very straightforward should one want to modify for their own purposes. In more detail:
 
 ```{r}
-cat(pull_section('setup_run_df', here::here('R','runEval.R'), num_lines = TRUE))
+cat(pull_section('setup_run_df', here::here('R', 'runEval.R'), num_lines = TRUE))
 ```
-Running code up to this line shows the following values, note that the dataframe is transposed with rows as columns and columns as rows--unreadable otherwise.
+
+Running code up to this line shows the following values, note that the dataframe is transposed with rows as columns and columns as rows--unreadable otherwise:
 
 ```{r echo=FALSE}
 # dependencies
@@ -97,47 +98,50 @@ library(cmdstanr)
 library(data.table)
 library(kableExtra)
 
-source(here::here("R","util.R"))
-source(here::here("R","SIRTDsim.R"))
-source(here::here("R","sim_configs.R"))
-source(here::here("R","modeling_configs.R"))
+source(here::here("R", "util.R"))
+source(here::here("R", "SIRTDsim.R"))
+source(here::here("R", "sim_configs.R"))
+source(here::here("R", "modeling_configs.R"))
 # dependencies
 # setup run_df
 run_df <- setup_run_df(seed = 93435, n_pop = 1000, n_days = 7)
 kable(t(run_df))
 ```
 
-This line constructs a basic template for the `run_df`, there is just one row at this point--remember transposed output. All subsequent additions/elaborations draw from this dataframe. 
+This line constructs a basic template for the `run_df`, there is just one row at this point--remember transposed output. All subsequent additions/elaborations draw from this dataframe:
+
 ```{r}
-cat(pull_section('sim_brazil_1', here::here('R','runEval.R'), num_lines = TRUE))
+cat(pull_section('sim_brazil_1', here::here('R', 'runEval.R'), num_lines = TRUE))
 ```
-The `sim_brazil_1` is a parameterization that roughly mimics the shape of the COVID-19 outbreak with corresponding simulated values as determined by trying values by hand. Look at the source for more info. Note that the prefix on the function is 'sim', which means that it is part of simulation. There is still one row in the dataframe but with simulation data and the generating paramaterzation. 
+The `sim_brazil_1` is a parameterization that roughly mimics the shape of the COVID-19 outbreak with corresponding simulated values as determined by trying values by hand. Look at the source code for more info. Note that the prefix on the function is `sim`, which means that it is part of simulation. There is still one row in the dataframe but with simulation data and the generating parameterization.
 
 The, remember transposed, dataframe is:
 
 ```{r echo=FALSE}
 run_df <- sim_brazil_1(run_df)
-kable(t(run_df), digits=3)
+kable(t(run_df), digits = 3)
 ```
 
-We now have simulation data from the SIRTD model for `n_days`. But still only one row--remember transposed above.
+We now have simulation data from the SIRTD model for `n_days`. But still only one row--remember transposed above:
 
 ```{r}
 cat(pull_section('sim_draw_params', here::here('R','runEval.R'), num_lines = TRUE))
 ```
-The next line runs two random based draws from the parmeterization in the single simulation in `run_df`. Two draws are conducted and returned. 
+
+The next line runs two random based draws from the parameterization in the single simulation in `run_df`. Two draws are conducted and returned:
 
 ```{r echo=FALSE}
 draws_run_df <- sim_draw_params(2, run_df)
 kable(t(draws_run_df))
 ```
 
-Above are transposed output for two draws for slight variations of the Brazil hand parameterization. 
+Above are transposed output for two draws for slight variations of the Brazil hand parameterization.
 
 ```{r}
-cat(pull_section("rbind", here::here('R','runEval.R'), num_lines = TRUE))
+cat(pull_section("rbind", here::here('R', 'runEval.R'), num_lines = TRUE))
 ```
-We bind the Brazil run with the draws resulting in 3 rows. 
+
+We bind the Brazil run with the draws resulting in 3 rows:
 
 ```{r echo=FALSE}
 run_df <- rbind(run_df, draws_run_df)
@@ -146,13 +150,13 @@ kable(t(run_df), digits = 3)
 
 ## Setting up modeling
 
-At this point we have three sets of data, one hand configured to mirror Brazil data and two that vary simulation parameters from the hand configured model. Now we apply modeling configurations with subroutines from `R/modeling_configs.R`. 
+At this point we have three sets of data, one hand configured to mirror Brazil data and two that vary simulation parameters from the hand configured model. Now we apply modeling configurations with subroutines from `R/modeling_configs.R`.
 
 ```{r}
-cat(pull_section("model_stan_SIRDs", here::here('R','runEval.R'), num_lines = TRUE))
+cat(pull_section("model_stan_SIRDs", here::here('R', 'runEval.R'), num_lines = TRUE))
 ```
 
-There are two model configurations which apply to the three rows uniformly so we end up with 6 configurations total. One model applies tweets to the task, and one does not. The final result is:
+There are two model configurations which apply to the three rows uniformly. Hence, we end up with 6 configurations total. One model applies tweets to the task, and one does not. The final result is:
 
 ```{r echo=FALSE}
 run_df <- model_stan_SIRDs(run_df)
@@ -160,31 +164,34 @@ kable(t(run_df), digits = 3)
 ```
 
 ## Configuring reporting
-The specific reporting can be controlled from the `run_df` as well. 
+
+The specific reporting can be controlled from the `run_df` as well.
 
 ```{r}
 cat(pull_section("reports <-", here::here('R','runEval.R'), num_lines = TRUE))
 ```
-After each `run_df` iteration the listed graphing and print routines are controlled via the above. This list is all available, they are explained below.  
+After each `run_df` iteration the listed graphing and print routines are controlled via the above. This list is all available, they are explained in the next section.
 
 ## Running models
 
-Each row of `run_df` is a complete specification of data and model configuration. The code simply iterates over each row, fits it with the appropriate model/model configuration if there is one specified and adds the results of computing how many simulated days data for tweets and deaths are in the .2 to .8 central interval of the samples for the model run. See `R/util.R` for the implementation of `countPredictionsInQuantile`.
+Each row of `run_df` is a complete specification of both data and model configuration. The code simply iterates over each row, fits it with the appropriate model/data configuration (if specified) and adds the results by computing simulated days data for tweets and deaths using the .2 to .8 central sample's interval for the model run. See `R/util.R` for the implementation of `countPredictionsInQuantile`.
 
 ```{r}
 cat(pull_section('# run models', here::here('R','runEval.R')))
 ```
-Only two models are available at present. 
+
+Only two models are available at present.
+
 ## Presenting results
 
-At this point results will likely get more idiosyncratic to experiment needs. The below if statements check the listed values for `reports` and apply the corresponding reporting. Note that each run is reported with no attempt to collect them into a collection--we intend to add that functionality eventually. In order there are graphing options to:
+At this point results will likely get more idiosyncratic to experiment needs. The below `if` statements check the listed values for `reports` and apply the corresponding reporting. Note that each run is reported with no attempt to collect them into a collection--we intend to add that functionality eventually.There are the following graphing options:
 
-* Graph simulation compartments with dots. 
+* Graph simulation compartments with dots.
 * Graph ODE compartments if the Stan model mirrors the states of the simulation, e.g., is roughly isomorphic.
-* Graph predicted tweets and predicted 'd' or deaths from the Stan model. If the likelihood is run then this is a posterior predictive check, if the likelihood is not run then it is a prior predictive check. There is a 20%/80% central interval ribbon plot as well. 
+* Graph predicted tweets and predicted `d` or deceased from the Stan model. If the likelihood is computed then this is a **posterior predictive check**, if the likelihood is *not* computed then it is a **prior predictive check**. There is a 20%/80% central interval ribbon plot as well.
 * Control over whether the plots are printed. All plots for a single run are overlaid.
 
-All subroutines are in the `R/Util.R` file. 
+All subroutines are in the `R/Util.R` file.
 
 ```{r}
   cat(pull_section('# section 6', here::here('R','runEval.R')))
@@ -196,21 +203,21 @@ A parameter recovery report finalizes the reporting options per run:
 ```{r}
  cat(pull_section('# section 7', here::here('R','runEval.R')))
 ```
+
 which reports on whether the simulation parameters and those from the model.
 
 # All run summary
+
 ```{r echo=FALSE}
 #  cat(param_recovery(data_df = run_df[j,], fit = fit))
 ```
 
-A summary across all the runs is done next by reporting relevant columns of the run_df:
+A summary across all the runs is done next by reporting relevant columns of the `run_df`:
 
 ```{r}
  cat(pull_section('# section 8', here::here('R','runEval.R')))
 ```
 
-
-
 There are many more result views available that we will eventually integrate into this document. They include:
 
-* Time series analyis, e.g., what happens with simulations that only provide the first interval of data to the models? 
+* Time series analysis, e.g., what happens with simulations that only provide the first interval of data to the models?
