@@ -79,7 +79,7 @@ sim_brazil_1 <- function (source_df) {
                                           run_df$n_days))
   run_df$gamma <- .255
   run_df$death_prob <- .01
-  run_df$tweet_rate <- .25
+  run_df$tweet_rate <- .1
   run_df$days2death <- 10
   run_df$n_patient_zero <- 10
   run_df$description <- "Brazil 1 approximation"
@@ -103,5 +103,6 @@ sim_brazil_1 <- function (source_df) {
   run_df$tweets <- list(sim_df$tweets)
   return(run_df)
 }
-
-#sim_brazil_1()
+#214,110,287
+#run_df <- setup_run_df(seed = 123, n_pop = 214110287, n_days = 365)
+#sim_brazil_1(run_df)

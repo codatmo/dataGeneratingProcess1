@@ -51,10 +51,16 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
   
     if (print) {
       predCasesLine = 'predicted cases'
-      predCasesRibbon = paste0('predicted cases ',minQuantileLabel, '/',
+      predCasesRibbon = paste0('predicted cases ', minQuantileLabel, '/',
                            maxQuantileLabel)
-      print(sprintf("Predicted %d cases and %d tweets within interval",
-                  deaths_in_interval, tweets_in_interval))
+      days_p = sprintf("For %d out of %d days", deaths_in_interval, 
+                     run_df$n_days)
+      i = sprintf(" the predicted deaths were within %.1f and %.1f sd quantile of truth",
+                    minQuantile, maxQuantile)
+      tweets_p = sprintf("\nFor %d days, ", tweets_in_interval)
+      i_2 = sprintf(" the predicted tweets were within %.1f and %.1f of truth",
+                    minQuantile, maxQuantile)
+      cat(paste0(days_p, i, tweets_p, i_2))
     }
     return(c(deaths_in_interval, tweets_in_interval))
   }

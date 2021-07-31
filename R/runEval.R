@@ -10,20 +10,20 @@ source(here::here("R","sim_configs.R"))
 source(here::here("R","modeling_configs.R"))
 # dependencies
 # setup run_df
-run_df <- setup_run_df(seed = 93435, n_pop = 1000, n_days = 7) # in R/util.R
+run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
 run_df <- sim_brazil_1(run_df) # in R/sim_configs.R
 draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
 run_df <- rbind(run_df, draws_run_df)
 
-run_df <- model_stan_SIRDs(run_df) #in R/modeling_configs.R
-run_df$ode_solver <- 'block' # set ODE solver in Stan program across all runs
+run_df <- model_stan_UNINOVE_Brazil(run_df) #in R/modeling_configs.R
 run_df$compute_likelihood <- 1 # compute likelihood across all runs
-run_df$reports <- list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
+run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
+  # list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
 # setup run_df
 # run models
 for (j in 1:nrow(run_df)) {
   fit <- NA
-  if (run_df[j,]$model_to_run == 'twitter_sird') {
+  if (run_df[j,]$model_to_run == 'baseline') {
     stan_data <-
       list(n_days = run_df[j,]$n_days,
            sDay1 = run_df[j,]$n_pop - 1,
@@ -47,7 +47,7 @@ for (j in 1:nrow(run_df)) {
                         seed = 4857)
     run_df[j,]$fit = list(fit)
   }
-  else if (run_df[j,]$model_to_run == 'tweet_sirtd_negbin_ODE') {
+  else if (run_df[j,]$model_to_run == 'UNINOVE_Brazil') {
     stan_data_2 <- list(n_days = run_df[j,]$n_days,
                         y0 = c(run_df[j,]$n_pop - run_df[j,]$n_patient_zero,
                                run_df[j,]$n_patient_zero, 0, 0, 0), # one more zero here
@@ -78,7 +78,7 @@ for (j in 1:nrow(run_df)) {
   if (run_df[j,]$model_to_run != 'none') {
     d_tweets_in_interval = countPredictionsInQuantile(fit = fit,
                                                       run_df = run_df,
-                                                      j = j, print = TRUE)
+                                                      j = j, print = FALSE)
     run_df[j,]$d_in_interval = d_tweets_in_interval[1]
     run_df[j,]$tweets_in_interval = d_tweets_in_interval[2]
   }
@@ -116,7 +116,7 @@ for (j in 1:nrow(run_df)) {
 }
 # section 8
 summary_cols = c('sim_run_id', 'model_to_run', 'beta_mean', 'gamma', 'death_prob',
-                 'tweet_rate', 'days2death', 'ode_solver', 'description',
-                 'd_in_interval', 'tweets_in_interval')
+                 'tweet_rate', 'days2death', 'description',
+                 'd_in_interval', 'tweets_in_interval','n_days')
 print(run_df[,summary_cols])
 # section 8
