@@ -1,3 +1,7 @@
+library(ggplot2)
+library(ggrepel)
+
+
 #' Count the number of truth data points contained in the quantile interval of
 #' model fit
 #' @param truth vector of true or simulated values
@@ -31,7 +35,7 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
   
     predCasesDf = fit$summary(variables = c('pred_deaths'), mean,
                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                      na.rm = TRUE))  #set to FALSE when Jose fixes his model
+                                      na.rm = FALSE))  #set to FALSE when Jose fixes his model
     predCasesDf$day = 1:nrow(predCasesDf)
   
     predTweetsDf = fit$summary(variables = c('pred_tweets'), mean,
@@ -50,15 +54,12 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
                                                    minQuantileLabel = minQuantileLabel)
   
     if (print) {
-      predCasesLine = 'predicted cases'
-      predCasesRibbon = paste0('predicted cases ', minQuantileLabel, '/',
-                           maxQuantileLabel)
-      days_p = sprintf("For %d out of %d days", deaths_in_interval, 
-                     run_df$n_days)
-      i = sprintf(" the predicted deaths were within %.1f and %.1f sd quantile of truth",
+      days_p = sprintf("Over %d days, %d predicted deaths", run_df[j,]$n_days,
+                        deaths_in_interval)
+      i = sprintf(" were in the %.1f and %.1f quantiles of the truth sd",
                     minQuantile, maxQuantile)
-      tweets_p = sprintf("\nFor %d days, ", tweets_in_interval)
-      i_2 = sprintf(" the predicted tweets were within %.1f and %.1f of truth",
+      tweets_p = sprintf("\n%d predicted tweets,", tweets_in_interval)
+      i_2 = sprintf(" were within %.1f and %.1f of truth",
                     minQuantile, maxQuantile)
       cat(paste0(days_p, i, tweets_p, i_2))
     }
@@ -70,7 +71,7 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
 #' y = count.
 #' @param data_df one row of the run_df with simulation data added
 #' @param hide_s Boolean to control whether to hide the s or susceptible counts
-graph_sim_data <- function(data_df, hide_s) {
+graph_sim_data <- function(data_df, hide_s, plot) {
     sim_df = data.frame(day = 1:data_df$n_days, 
                         tweets = unlist(data_df$tweets), 
                         s = unlist(data_df$s),
@@ -83,30 +84,46 @@ graph_sim_data <- function(data_df, hide_s) {
     if (hide_s) {
       compartment_names <- compartment_names[-1]
     }
+    i_mean = mean(sim_df$i)
+    gt_mean_days = sim_df[sim_df$i >= i_mean,]$day
+    display_day = gt_mean_days[1]
     sim_long_df = gather(data = sim_df, key = "compartment_sim", value = "count",
                          all_of(c('tweets', compartment_names)))
-    return(geom_point(data = sim_long_df, aes(y = count, 
-                                              color = compartment_sim),
-                      size = .5))
+    return(plot + 
+             geom_point(data = sim_long_df, aes(y = count, 
+                                                color = compartment_sim),
+                      size = .5) + 
+             geom_label_repel(data = subset(sim_long_df, 
+                                            day == display_day), 
+                              aes(label = compartment_sim,
+                                  color = compartment_sim)))
+    
 }
 
 #' Graph daily ODE means from SIRTD model. Returns a ggplot geom_line element
 #' @param data_df A row from run_df
 #' @param fit A fit object returned by cmdstanR with ode_states defined
 #' @param hide_s Boolean to control whether to hide susceptible counts
-graph_ODE <- function(data_df, fit, hide_s) {
-  results_ODE_df = fit$summary(variables = c('ode_states'))
-  compartment_names = c('s', 'i', 'r', 't', 'd')
+graph_ODE <- function(data_df, fit, hide_s, plot) {
+  compartment_names = c('S', 'I', 'R', 'D')
   if (hide_s) {
     compartment_names <- compartment_names[-1]
   }
-  ODE_df = data.frame(matrix(results_ODE_df$median, nrow = data_df$n_days,
-                            ncol = length(compartment_names)))
-  colnames(ODE_df) = compartment_names
-  ODE_df$day = 1:data_df$n_days
-  ODE_long_df = gather(data = ODE_df, key = "compartment_ODE", value = "count",
-                     all_of(compartment_names))
-  return(geom_line(data = ODE_long_df, aes(color = compartment_ODE)))
+  ODE_long_df = data.frame()
+  for (name in compartment_names) {
+    compartment_ODE_df = fit$summary(variables = c(name))
+    compartment_ODE_df$compartment_ODE = name
+    compartment_ODE_df$day = 1:nrow(compartment_ODE_df)
+    compartment_ODE_df$count = compartment_ODE_df$mean  # maybe should be median
+    ODE_long_df = rbind(ODE_long_df,compartment_ODE_df)
+  }
+  return(
+    plot + 
+      geom_line(data = ODE_long_df, aes(color = compartment_ODE)) + 
+      geom_label_repel(data = subset(ODE_long_df, day == data_df$n_days), 
+                              aes(label = compartment_ODE,
+                                  color = compartment_ODE))
+  )
 }
 
 #' returns ggplot geom_line with optional ribbon around 20/80 central interval
@@ -192,6 +209,7 @@ setup_run_df <- function(seed, n_pop, n_days) {
   # setup prediction columns
   template_df$d_in_interval <- NA_integer_
   template_df$tweets_in_interval <- NA_integer_
+  template_df$fit <- NA
   set.seed(template_df$seed)
   return(template_df)
 }

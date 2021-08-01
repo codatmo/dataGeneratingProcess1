@@ -1,3 +1,7 @@
+#todo
+# serialize run_df?? json?
+# run Brazil data with baseline to get params 
+#
 # dependencies
 library(tidyverse)
 library(cmdstanr)
@@ -10,18 +14,21 @@ source(here::here("R","sim_configs.R"))
 source(here::here("R","modeling_configs.R"))
 # dependencies
 # setup run_df
+#run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
 run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
 run_df <- sim_brazil_1(run_df) # in R/sim_configs.R
-draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
-run_df <- rbind(run_df, draws_run_df)
+#draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
+#run_df <- rbind(run_df, draws_run_df)
 
-run_df <- model_stan_UNINOVE_Brazil(run_df) #in R/modeling_configs.R
+run_df <- model_stan_baseline(run_df) #in R/modeling_configs.R
 run_df$compute_likelihood <- 1 # compute likelihood across all runs
 run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
-  # list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
+   #list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
 # setup run_df
 # run models
-for (j in 1:nrow(run_df)) {
+j <- 0
+while (j < nrow(run_df)) {
+  j <- j + 1
   fit <- NA
   if (run_df[j,]$model_to_run == 'baseline') {
     stan_data <-
@@ -36,8 +43,10 @@ for (j in 1:nrow(run_df)) {
            compute_likelihood = run_df[j,]$compute_likelihood,
            run_twitter = run_df[j,]$apply_twitter_data,
            run_block_ODE = ifelse(run_df[j,]$ode_solver == 'block', 1, 0),
-           run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0))
-    model <- cmdstan_model(here::here("stan", "tweet_sird.stan"))
+           run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0),
+           scale = 1,
+           center = 1)
+    model <- cmdstan_model(here::here("stan", "baseline.stan"))
 
     fit <- model$sample(data=stan_data,
                         parallel_chains = 4,
@@ -78,7 +87,7 @@ for (j in 1:nrow(run_df)) {
   if (run_df[j,]$model_to_run != 'none') {
     d_tweets_in_interval = countPredictionsInQuantile(fit = fit,
                                                       run_df = run_df,
-                                                      j = j, print = FALSE)
+                                                      j = j, print = TRUE)
     run_df[j,]$d_in_interval = d_tweets_in_interval[1]
     run_df[j,]$tweets_in_interval = d_tweets_in_interval[2]
   }
@@ -89,10 +98,11 @@ for (j in 1:nrow(run_df)) {
 # section 6
   plot <- ggplot(data = NULL, aes(x = day, y = count))
   if ('graph_sim' %in% unlist(run_df[j,]$reports)) {
-    plot <- plot +  graph_sim_data(data_df = run_df[j,], hide_s = TRUE)
+    plot <- graph_sim_data(data_df = run_df[j,], hide_s = TRUE, plot = plot)
   }
   if ('graph_ODE' %in% unlist(run_df[j,]$reports)) {
-    plot <- plot + graph_ODE(data_df = run_df[j,], fit = fit, hide_s = TRUE)
+    plot <- graph_ODE(data_df = run_df[j,], fit = fit, hide_s = TRUE,
+                             plot = plot)
   }
   if ('graph_tweets' %in% unlist(run_df[j,]$reports)) {
     plot <- plot_predictions(plot = plot, prediction_label = 'pred_tweets',
@@ -104,6 +114,7 @@ for (j in 1:nrow(run_df)) {
                              fit = fit,
                              show_ribbon = TRUE)
   }
+  plot = plot + theme(legend.position = "none")
   if ('plot' %in% unlist(run_df[j,]$reports)) {
     print(plot)
   }
