@@ -212,6 +212,7 @@ setup_run_df <- function(seed, n_pop, n_days) {
   # any model setup
   template_df$model_to_run <- 'none'
   template_df$compute_likelihood <- NA
+  template_df$use_tweets <- NA
 
   #setup data columns 
   template_df$s <- list(c())

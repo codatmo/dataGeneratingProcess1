@@ -16,13 +16,14 @@ source(here::here("R","modeling_configs.R"))
 # dependencies
 # setup run_df
 #run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
-run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
-brazil_sim_df <- sim_brazil_1(run_df) # in R/sim_configs.R
-brazil_actual_df <- data_brazil_1(run_df)
+setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
+brazil_sim_df <- sim_brazil_1(setup_run_df) # in R/sim_configs.R
+brazil_actual_df <- data_brazil_1(setup_run_df)
 #draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
-run_df <- rbind(brazil_sim_df, brazil_actual_df)
+run_data_df <- rbind(brazil_sim_df, brazil_actual_df)
 
-#run_df <- model_stan_baseline(run_df) #in R/modeling_configs.R
+run_df <- model_stan_baseline(run_data_df) #in R/modeling_configs.R
+run_df$use_tweets <- 0
 #run_df$compute_likelihood <- 1 # compute likelihood across all runs
 #run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
    #list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
@@ -43,7 +44,7 @@ while (j < nrow(run_df)) {
            tweets = unlist(run_df[j,]$tweets),
            deaths = unlist(run_df[j,]$d),
            compute_likelihood = run_df[j,]$compute_likelihood,
-           run_twitter = run_df[j,]$apply_twitter_data,
+           run_twitter = run_df[j,]$use_tweets,
            run_block_ODE = ifelse(run_df[j,]$ode_solver == 'block', 1, 0),
            run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0),
            scale = 1,

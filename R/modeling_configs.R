@@ -11,6 +11,7 @@ model_stan_baseline <- function(run_df) {
   model_tweets_df$apply_twitter_data <- 1
   model_tweets_df$description <- paste0(model_tweets_df$description,
                                       " use tweets")
+  model_tweets_df$compute_likelihood <- 1
 
   combined_df = model_tweets_df # rbind(model_no_tweets_df, model_tweets_df)
   combined_df$ode_solver <- 'block'
