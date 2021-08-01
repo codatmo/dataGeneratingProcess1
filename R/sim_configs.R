@@ -101,6 +101,7 @@ sim_brazil_1 <- function (source_df) {
   run_df$t <- list(sim_df$t)
   run_df$d <- list(sim_df$d)
   run_df$tweets <- list(sim_df$tweets)
+  run_df$reports <- list(c('graph_sim', 'plot'))
   return(run_df)
 }
 #214,110,287

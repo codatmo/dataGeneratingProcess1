@@ -100,6 +100,21 @@ graph_sim_data <- function(data_df, hide_s, plot) {
     
 }
 
+graph_real_data <- function(data_df, plot) {
+  real_data_df <- data.frame(count = unlist(data_df$d), 
+                             day = 1:data_df$n_days,
+                             source = 'deaths')
+  return(plot + 
+           geom_line(data = real_data_df, aes(y = count, 
+                                              color = source),
+                     size = .5) + 
+           geom_label_repel(data = subset(real_data_df, 
+                                          day == round(data_df$n_days/2)), 
+                            aes(label = source,
+                                color = source)))
+}
+
+
 #' Graph daily ODE means from SIRTD model. Returns a ggplot geom_line element
 #' @param data_df A row from run_df
 #' @param fit A fit object returned by cmdstanR with ode_states defined
@@ -206,6 +221,16 @@ setup_run_df <- function(seed, n_pop, n_days) {
   template_df$d <- list(c())
   template_df$tweets <- list(c())
 
+  #needed for sims
+  template_df$beta_daily_rate <- NA
+  template_df$beta_mean <- NA
+  template_df$gamma <- NA
+  template_df$death_prob <- NA
+  template_df$tweet_rate <- NA
+  template_df$days2death <- NA
+  
+  template_df$reports <- NA
+  
   # setup prediction columns
   template_df$d_in_interval <- NA_integer_
   template_df$tweets_in_interval <- NA_integer_

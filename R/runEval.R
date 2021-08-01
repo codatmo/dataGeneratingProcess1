@@ -11,18 +11,20 @@ library(kableExtra)
 source(here::here("R","util.R"))
 source(here::here("R","SIRTDsim.R"))
 source(here::here("R","sim_configs.R"))
+source(here::here("R", "data_configs.R"))
 source(here::here("R","modeling_configs.R"))
 # dependencies
 # setup run_df
 #run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
 run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
-run_df <- sim_brazil_1(run_df) # in R/sim_configs.R
+brazil_sim_df <- sim_brazil_1(run_df) # in R/sim_configs.R
+brazil_actual_df <- data_brazil_1(run_df)
 #draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
-#run_df <- rbind(run_df, draws_run_df)
+run_df <- rbind(brazil_sim_df, brazil_actual_df)
 
-run_df <- model_stan_baseline(run_df) #in R/modeling_configs.R
-run_df$compute_likelihood <- 1 # compute likelihood across all runs
-run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
+#run_df <- model_stan_baseline(run_df) #in R/modeling_configs.R
+#run_df$compute_likelihood <- 1 # compute likelihood across all runs
+#run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
    #list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
 # setup run_df
 # run models
@@ -97,6 +99,9 @@ while (j < nrow(run_df)) {
   }
 # section 6
   plot <- ggplot(data = NULL, aes(x = day, y = count))
+  if ('graph_data' %in% unlist(run_df[j,]$reports)) {
+    plot <- graph_real_data(data_df = run_df[j,], plot = plot)
+  }
   if ('graph_sim' %in% unlist(run_df[j,]$reports)) {
     plot <- graph_sim_data(data_df = run_df[j,], hide_s = TRUE, plot = plot)
   }
@@ -115,7 +120,7 @@ while (j < nrow(run_df)) {
                              show_ribbon = TRUE)
   }
   plot = plot + theme(legend.position = "none")
-  if ('plot' %in% unlist(run_df[j,]$reports)) {
+  if (length(unlist(run_df[j,]$reports)) > 0) {
     print(plot)
   }
 # section 6
