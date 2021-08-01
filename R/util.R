@@ -101,15 +101,19 @@ graph_sim_data <- function(data_df, hide_s, plot) {
 }
 
 graph_real_data <- function(data_df, plot) {
-  real_data_df <- data.frame(count = unlist(data_df$d), 
+  real_deaths_data_df <- data.frame(count = unlist(data_df$d), 
                              day = 1:data_df$n_days,
                              source = 'deaths')
+  real_tweets_data_df <- data.frame(count = unlist(data_df$tweets), 
+                                    day = 1:data_df$n_days,
+                                    source = 'tweets')
+  real_data_df <- rbind(real_deaths_data_df,real_tweets_data_df)
   return(plot + 
-           geom_line(data = real_data_df, aes(y = count, 
-                                              color = source),
-                     size = .5) + 
-           geom_label_repel(data = subset(real_data_df, 
-                                          day == round(data_df$n_days/2)), 
+         geom_line(data = real_data_df, aes(y = count, 
+                                            color = source),
+                  size = .5) + 
+         geom_label_repel(data = subset(real_data_df, 
+                                        day == round(data_df$n_days/2)), 
                             aes(label = source,
                                 color = source)))
 }
