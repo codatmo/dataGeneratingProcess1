@@ -76,6 +76,8 @@ data {
   int<lower = 0, upper = 1> run_twitter;
   int<lower = 0, upper = 1> run_block_ODE;
   int<lower = 0, upper = 1> run_rk45_ODE;
+  int<lower = 0, upper = 1> scale;
+  int<lower = 0, upper = 1> center;
 }
 transformed data {
   real x_r[0]; //need for ODE function
@@ -87,29 +89,46 @@ transformed data {
   int iCompartment = 2;
   int rCompartment = 3;
   int dCompartment = 4;
-  real sdTweets = sd(tweets);
-  real meanTweets = mean(tweets);
-  vector[n_days] tweets_s_c = (tweets)/sdTweets;
-  real sdDeaths = sd(deaths);
-  real meanDeaths = mean(deaths);
-  vector[n_days] deaths_s_c = (deaths)/sdDeaths;
   real ts[n_days];
+  real meanDeaths = 0;
+  real meanTweets = 0;
+  real sdDeaths = 1;
+  real sdTweets = 1; 
+  vector[n_days] deaths_munged = deaths; 
+  vector[n_days] tweets_munged = tweets; 
+  if (center == 1) {
+    meanDeaths = mean(deaths);
+    deaths_munged = deaths_munged - meanDeaths;
+    meanTweets = mean(tweets);
+    tweets_munged = tweets_munged - meanTweets;
+  }
+  if (scale == 1) {
+    sdDeaths = sd(deaths);
+    if (sdDeaths == 0) {
+       reject("Standard deviation of zero for deaths");
+    }
+      deaths_munged = deaths_munged/sdDeaths;
+    if (sdTweets)
+    sdTweets = sd(tweets);
+    if (sdTweets == 0) {
+      reject("Standard deviation of zero for tweets");
+    }
+    tweets_munged = tweets_munged/sdTweets;
+  }
   ts[1] = 1.0;
   for (i in 2:n_days) {
       ts[i] = ts[i - 1] + 1;
   }
-#  print("tweets_s_c", tweets_s_c);
-#  print("deaths_s_c", deaths_s_c);
+  print("tweets", tweets);
+  print("tweets_munged", tweets_munged);
+  print("deaths", deaths);
+  print("deaths_munged", deaths_munged);
 }
+
 parameters {
   real<lower = 0, upper = 1> gamma;
   real<lower=0, upper = 2> beta;
   real<lower=0, upper = 1> deathRate;
-  real<lower = 0> sigma_sd_beta;
-  real<lower = 0> sigma_sd_gamma;
-  real<lower = 0> sigma_sd_deaths;
-  real<lower = 0> sigma_compartment_noise;
-  real<lower = 0> sigma_twitter_noise;
   real<lower=.001> lambda_twitter;
 }
 transformed parameters{
@@ -120,7 +139,6 @@ transformed parameters{
   theta[1] = beta;
   theta[2] = gamma;
   theta[3] = deathRate;
-  
   if (run_rk45_ODE == 1 && run_block_ODE == 1) {
     reject("cannot run both rk45 and block ODEs");
   }
@@ -134,20 +152,18 @@ transformed parameters{
 }
 
 model {
-  sigma_sd_beta ~ exponential(10);
-  sigma_sd_gamma ~ exponential(10);
-  sigma_sd_deaths ~ exponential(10);
-  beta ~ normal(0, sigma_sd_beta);
-  gamma ~ normal(0, sigma_sd_gamma);
-  deathRate ~ normal(0, sigma_sd_deaths);
+  beta ~ normal(0, 1);
+  gamma ~ normal(0, 1);
+  deathRate ~ normal(0, 1);
   lambda_twitter ~ normal(0,1);
   if (compute_likelihood == 1) { 
     for (i in 1:n_days) {
-      	deaths_s_c[i] ~ normal(daily_counts_ODE[i, dCompartment], 
-                                       sigma_compartment_noise);
+      	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment], 
+                                       1);
       if (run_twitter == 1) {
-        tweets_s_c[i] ~ normal(lambda_twitter * daily_counts_ODE[i, iCompartment],
-                                          sigma_twitter_noise);
+        tweets_munged[i] ~ normal(lambda_twitter * 
+                                  daily_counts_ODE[i, iCompartment],
+                                          1);
       }
     }
   }
@@ -160,17 +176,21 @@ generated quantities {
   real pred_tweets[n_days];
   real pred_i[n_days];
   matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
+  matrix[n_compartments, n_days] transposed_ode_states = daily_counts_ODE';
+  row_vector[n_days] S = transposed_ode_states[sCompartment];
+  row_vector[n_days] I = transposed_ode_states[iCompartment];
+  row_vector[n_days] R = transposed_ode_states[rCompartment];
+  row_vector[n_days] D = transposed_ode_states[dCompartment];
+
   for (i in 1:n_days) {
       if (run_twitter == 1) {
-          pred_tweets[i] = sdTweets * (normal_rng(lambda_twitter *
-                                   daily_counts_ODE[i, dCompartment],
-                                   sigma_twitter_noise));
+        pred_tweets[i] = sdTweets * lambda_twitter * 
+                         daily_counts_ODE[i, dCompartment] + meanTweets;
       }
       else {
         pred_tweets[i] = 0;
       }
-      pred_deaths[i] = sdDeaths * (normal_rng(daily_counts_ODE[i, iCompartment], 
-                                 sigma_compartment_noise));
+      pred_deaths[i] = sdDeaths * daily_counts_ODE[i, iCompartment] 
+                       + meanDeaths;
   }
 }
-

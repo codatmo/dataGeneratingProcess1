@@ -64,9 +64,9 @@ transformed parameters{
   real phi_twitter = 1.0 / phi_twitter_inv;
 
   // States to be recovered
-  vector[5] state_estimate[n_days];
+  vector[5] daily_counts_ODE[n_days];
 
-  state_estimate = ode_rk45_tol(sird, y0, t0, ts,
+  daily_counts_ODE = ode_rk45_tol(sird, y0, t0, ts,
                                 1e-6, 1e-6, 1000, // if you want custom tolerances
                                 beta, omega, dI, dT);
 }
@@ -83,10 +83,10 @@ model {
   if (compute_likelihood == 1){
     for (i in 1:n_days) {
       if (use_twitter == 1) {
-        symptomaticTweets[i] ~ neg_binomial_2(twitter_rate * state_estimate[i, 2],
+        symptomaticTweets[i] ~ neg_binomial_2(twitter_rate * daily_counts_ODE[i, 2],
                                               phi_twitter);
       }
-      death_count[i] ~ neg_binomial_2(state_estimate[i, 5], phi);
+      death_count[i] ~ neg_binomial_2(daily_counts_ODE[i, 5], phi);
     }
   }
 }
@@ -100,11 +100,11 @@ generated quantities {
   vector[n_days] state_D;
 
   // Populate States
-  state_S = to_vector(state_estimate[, 1]);
-  state_I = to_vector(state_estimate[, 2]);
-  state_R = to_vector(state_estimate[, 3]);
-  state_T = to_vector(state_estimate[, 4]);
-  state_D = to_vector(state_estimate[, 5]);
+  state_S = to_vector(daily_counts_ODE[, 1]);
+  state_I = to_vector(daily_counts_ODE[, 2]);
+  state_R = to_vector(daily_counts_ODE[, 3]);
+  state_T = to_vector(daily_counts_ODE[, 4]);
+  state_D = to_vector(daily_counts_ODE[, 5]);
 
   // Tweets
   vector[n_days] state_tweets;
@@ -115,6 +115,7 @@ generated quantities {
   real R0 = beta * dI;
   int pred_deaths[n_days];
   int pred_tweets[n_days];
+  real gamma = dI; // returning dI as gamma for breck's
   for (i in 1:n_days) {
      if (compute_likelihood == 1) {
           pred_deaths[i] = neg_binomial_2_rng(state_D[i], phi);
@@ -122,6 +123,9 @@ generated quantities {
       if (use_twitter == 1) {
           pred_tweets[i] = neg_binomial_2_rng(twitter_rate *
                                    state_I[i], phi_twitter);
+      }
+      else {
+        pred_tweets[i] = 0;
       }
   }
 }
