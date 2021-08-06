@@ -1,6 +1,7 @@
 #todo
 # serialize run_df?? json?
-# run Brazil data with baseline to get params 
+# jupyter notebook with simulation sliders
+# 
 #
 # dependencies
 library(tidyverse)
@@ -20,7 +21,7 @@ setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in
 brazil_sim_df <- sim_brazil_1(setup_run_df) # in R/sim_configs.R
 brazil_actual_df <- data_brazil_1(setup_run_df)
 #draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
-run_data_df <- rbind(brazil_sim_df, brazil_actual_df)
+run_data_df <- brazil_actual_df #rbind(brazil_sim_df, brazil_actual_df)
 
 run_df <- model_stan_baseline(run_data_df) #in R/modeling_configs.R
 run_df$use_tweets <- 0

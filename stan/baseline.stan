@@ -61,7 +61,6 @@ functions {
     }
     return day_counts;
   }
-
 }
 data {
   int<lower=1> n_days;
@@ -154,7 +153,7 @@ transformed parameters{
 model {
   beta ~ normal(0, 1);
   gamma ~ normal(0, 1);
-  deathRate ~ normal(0, 1);
+  deathRate ~ normal(0, .01);
   lambda_twitter ~ normal(0,1);
   if (compute_likelihood == 1) { 
     for (i in 1:n_days) {
@@ -174,8 +173,7 @@ generated quantities {
   real recovery_time = 1 / gamma;
   real pred_deaths[n_days];
   real pred_tweets[n_days];
-  real pred_i[n_days];
-  matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
+  //  matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
   matrix[n_compartments, n_days] transposed_ode_states = daily_counts_ODE';
   row_vector[n_days] S = transposed_ode_states[sCompartment];
   row_vector[n_days] I = transposed_ode_states[iCompartment];
